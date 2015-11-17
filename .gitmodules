@@ -1,6 +1,3 @@
-[submodule "cpp-cgdk"]
-	path = cpp-cgdk
-	url = git@github.com:Russian-AI-Cup-2015/cpp-cgdk.git
 [submodule "notreal2d"]
 	path = notreal2d
 	url = git@github.com:Russian-AI-Cup/notreal2d.git
