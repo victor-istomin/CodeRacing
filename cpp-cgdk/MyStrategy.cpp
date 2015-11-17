@@ -28,6 +28,37 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	// get next waypoint
 	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
+	/* optimize cornering */
+	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+
+	if (1)
+	{
+		const double FAR = game.getTrackTileSize() * 1.3;
+		double cornerTileOffset = 0.25 * game.getTrackTileSize();
+		int offsetDirection = distanceToWaypoint > FAR ? -1 : 1;
+		TileType tileType = world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()];
+		switch (tileType) 
+		{
+		case LEFT_TOP_CORNER:
+			nextWaypoint.x += cornerTileOffset * offsetDirection;
+			nextWaypoint.y += cornerTileOffset * offsetDirection;
+			break;
+		case RIGHT_TOP_CORNER:
+			nextWaypoint.x -= cornerTileOffset * offsetDirection;
+			nextWaypoint.y += cornerTileOffset * offsetDirection;
+			break;
+		case LEFT_BOTTOM_CORNER:
+			nextWaypoint.x += cornerTileOffset * offsetDirection;
+			nextWaypoint.y -= cornerTileOffset * offsetDirection;
+			break;
+		case RIGHT_BOTTOM_CORNER:
+			nextWaypoint.x -= cornerTileOffset * offsetDirection;
+			nextWaypoint.y -= cornerTileOffset * offsetDirection;
+			break;
+		default:
+			break;
+		}
+	}
 	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
 
 	if (isWallCollision())
@@ -42,7 +73,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor / PI);
 	move.setEnginePower(1);
 
-	bool isNearWaypoint = (self.getDistanceTo(nextWaypoint.x, nextWaypoint.y)) < game.getTrackTileSize() && m_statistics.m_currentSpeed > 15;
+
+
+	bool isNearWaypoint = distanceToWaypoint < game.getTrackTileSize() && m_statistics.m_currentSpeed > 15;
 	bool isBigAngleToWaypoint = m_statistics.m_currentSpeed * std::abs(angleToWaypoint) > (10 * PI / 4);
 	
 	// brake before waypoint
