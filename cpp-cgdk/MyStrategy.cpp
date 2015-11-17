@@ -144,7 +144,7 @@ void MyStrategy::updateStates(const model::Car& self, const model::World& world,
 bool MyStrategy::isWallCollision()
 {
 	static const double STOPPED   = 5;
-	static const int    TICKS_GAP = 90;
+	static const int    TICKS_GAP = 80;
 
 	int currentTick = m_world->getTick();
 	bool isJustEscaped = (currentTick - m_statistics.m_lastEscapeTick) < TICKS_GAP;
