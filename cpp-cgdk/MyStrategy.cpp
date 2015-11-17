@@ -83,7 +83,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	if (isWallCollision())
 	{
 		move.setEnginePower(-1);
-		move.setWheelTurn(-1 * angleToWaypoint * k_angleFactor / PI);
+		move.setWheelTurn(-2 * angleToWaypoint * k_angleFactor / PI);
 		return; // TODO
 	}
 
@@ -96,7 +96,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	
 	// move
-	int turnDirection = isMovingForward() ? 1 /* front gear*/ : -1 /* read gear*/;
+	int turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor / PI);
 	move.setEnginePower(1);
 
