@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <iostream>
+#include <set>
 
 using namespace model;
 
@@ -111,6 +113,8 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		move.setBrake(true);
 		move.setUseNitro(false);
 	}
+
+	printFinishStats();
 }
 
 
@@ -173,4 +177,38 @@ bool MyStrategy::isWallCollision()
 	}
 
 	return false;
+}
+
+void MyStrategy::printFinishStats() const
+{
+#if defined _DEBUG
+
+	if (!m_self->isFinishedTrack())
+		return;
+
+	static std::set<long long> finishedCars;
+
+	if (finishedCars.find(m_self->getId()) == finishedCars.end())
+	{
+		finishedCars.insert(m_self->getId());
+
+		std::cout << "Car " << m_self->getId() << " finished '" << m_world->getMapName() << "' at: " << m_world->getTick() << std::endl;
+		m_statistics.output(m_world->getTick());
+	}
+#endif
+}
+
+void MyStrategy::Statistics::output(int ticks) const
+{
+#define STAT(name)                << "  " #name << ": " << name << "; " << std::endl
+#define STAT_COMPUTE(name, value) << "  " name  << ": " << (value) << "; " << std::endl
+
+	std::cout << "Stats: " << std::endl
+		STAT(m_maxSpeed)
+		STAT(m_currentSpeed)
+		STAT(m_previousSpeed)
+		STAT(m_lastEscapeTick)
+		STAT(m_isEscapingCollision)
+		STAT(m_lastOilTick)
+		STAT_COMPUTE("avg speed", m_sumSpeed / ticks);
 }
