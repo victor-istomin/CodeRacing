@@ -21,6 +21,18 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
     move.setThrowProjectile(true);
     move.setSpillOil(true);
 
+	/*
+	static bool dbgIsCollisionTest = false;
+	if (!dbgIsCollisionTest)
+	{
+		if (!isWallCollision())
+		{
+			move.setEnginePower(0.5);
+			return;
+		}
+		dbgIsCollisionTest = true;
+	}*/
+
 	// get next waypoint
 	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
@@ -113,15 +125,15 @@ void MyStrategy::updateStates(const model::Car& self, const model::World& world,
 
 bool MyStrategy::isWallCollision()
 {
-	static const double STOPPED = 5;
-	static const int    TICKS_GAP = 10;
+	static const double STOPPED   = 5;
+	static const int    TICKS_GAP = 75;
 
-	int currentTick = m_world->getLastTickIndex();
-	bool isNotJustEscaped = (currentTick - m_statistics.m_lastEscapeTick) > TICKS_GAP;
+	int currentTick = m_world->getTick();
+	bool isJustEscaped = (currentTick - m_statistics.m_lastEscapeTick) < TICKS_GAP;
 
 	if (!m_statistics.m_isEscapingCollision)
 	{
-		if (m_statistics.m_previousSpeed > m_statistics.m_currentSpeed * 3 && isMovingForward())
+		if (m_statistics.m_previousSpeed > m_statistics.m_currentSpeed * 3 && isMovingForward() && !isJustEscaped)
 		{
 			m_statistics.m_isEscapingCollision = true;
 			m_statistics.m_lastEscapeTick = currentTick;
@@ -132,8 +144,7 @@ bool MyStrategy::isWallCollision()
 	{ 
 		if (m_statistics.m_currentSpeed < STOPPED)
 		{
-			m_statistics.m_lastEscapeTick = currentTick;
-			return true; // still escaping
+			return isJustEscaped; // still escaping
 		}
 		else
 		{
