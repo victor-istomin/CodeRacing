@@ -4,6 +4,7 @@
 #define _MY_STRATEGY_H_
 
 #include "Strategy.h"
+#include <cmath>
 
 class MyStrategy : public Strategy 
 {
