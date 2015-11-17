@@ -19,7 +19,18 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
     move.setEnginePower(1.0);
     move.setThrowProjectile(true);
-    move.setSpillOil(true);
+
+	// oil usage
+	if(self.getOilCanisterCount() > 0)
+	{
+		const int OIL_SPILL_DELAY = 500;
+		int tick = world.getTick();
+		if (m_statistics.m_lastOilTick + OIL_SPILL_DELAY < tick)
+		{
+			move.setSpillOil(true);
+			m_statistics.m_lastOilTick = tick;
+		}
+	}
 
 	/*
 	static bool dbgIsCollisionTest = false;
@@ -113,6 +124,8 @@ MyStrategy::MyStrategy()
 
 void MyStrategy::updateStates(const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move)
 {
+	bool isFirstTimeInit = m_world == nullptr;
+
 	m_self = &self;
 	m_world = &world;
 	m_game = &game;
@@ -121,6 +134,11 @@ void MyStrategy::updateStates(const model::Car& self, const model::World& world,
 	m_statistics.m_previousSpeed = m_statistics.m_currentSpeed;
 	m_statistics.m_currentSpeed = std::hypot(self.getSpeedX(), self.getSpeedY());
 	m_statistics.m_maxSpeed = std::max(m_statistics.m_maxSpeed, m_statistics.m_currentSpeed);
+
+	if (isFirstTimeInit)
+	{
+		m_statistics.m_lastOilTick = game.getInitialFreezeDurationTicks();
+	}
 }
 
 bool MyStrategy::isWallCollision()

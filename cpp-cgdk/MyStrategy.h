@@ -16,13 +16,14 @@ public:
 private:
 	struct Statistics
 	{
-		Statistics() : m_maxSpeed(0), m_currentSpeed(0), m_previousSpeed(0), m_lastEscapeTick(0), m_isEscapingCollision(false) {}
+		Statistics() : m_maxSpeed(0), m_currentSpeed(0), m_previousSpeed(0), m_lastEscapeTick(0), m_lastOilTick(0), m_isEscapingCollision(false) {}
 
 		double m_maxSpeed;
 		double m_currentSpeed;
 		double m_previousSpeed;
 		int    m_lastEscapeTick;
 		bool   m_isEscapingCollision;
+		int    m_lastOilTick;
 	};
 
 	static const double k_angleFactor;
