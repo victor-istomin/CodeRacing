@@ -21,17 +21,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
     move.setThrowProjectile(true);
     move.setSpillOil(true);
 
-    if (world.getTick() > game.getInitialFreezeDurationTicks()) 
-	{
-        //move.setUseNitro(true);
-    }
-
 	// get next waypoint
 	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
-	/* optimize cornering */
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
-
-	if (1)
+	/* optimize cornering */
 	{
 		const double FAR = game.getTrackTileSize() * 1.3;
 		double cornerTileOffset = 0.25 * game.getTrackTileSize();
@@ -59,7 +52,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 			break;
 		}
 	}
+
 	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
+	distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+
 
 	if (isWallCollision())
 	{
@@ -67,6 +63,14 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		move.setWheelTurn(-1 * angleToWaypoint * k_angleFactor / PI);
 		return; // TODO
 	}
+
+	int degreesToWaypoint = static_cast<int>(std::abs(angleToWaypoint) * PI / 180);
+	if (world.getTick() > game.getInitialFreezeDurationTicks() && ((degreesToWaypoint % 90) < 10)
+		&& distanceToWaypoint > 3 * game.getTrackTileSize())
+	{
+		move.setUseNitro(true);
+	}
+
 	
 	// move
 	int turnDirection = isMovingForward() ? 1 /* front gear*/ : -1 /* read gear*/;
@@ -74,14 +78,15 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setEnginePower(1);
 
 
-
-	bool isNearWaypoint = distanceToWaypoint < game.getTrackTileSize() && m_statistics.m_currentSpeed > 15;
+	int  speedModifier = m_statistics.m_currentSpeed > 30 ? 2 : 1;
+	bool isNearWaypoint = distanceToWaypoint < game.getTrackTileSize() * speedModifier && m_statistics.m_currentSpeed > 15;
 	bool isBigAngleToWaypoint = m_statistics.m_currentSpeed * std::abs(angleToWaypoint) > (10 * PI / 4);
 	
 	// brake before waypoint
 	if (isBigAngleToWaypoint || isNearWaypoint)
 	{
 		move.setBrake(true);
+		move.setUseNitro(false);
 	}
 }
 
@@ -116,7 +121,7 @@ bool MyStrategy::isWallCollision()
 
 	if (!m_statistics.m_isEscapingCollision)
 	{
-		if (m_statistics.m_previousSpeed > m_statistics.m_currentSpeed * 3)
+		if (m_statistics.m_previousSpeed > m_statistics.m_currentSpeed * 3 && isMovingForward())
 		{
 			m_statistics.m_isEscapingCollision = true;
 			m_statistics.m_lastEscapeTick = currentTick;
