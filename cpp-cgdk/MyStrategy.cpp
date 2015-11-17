@@ -36,12 +36,20 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		move.setWheelTurn(-1 * angleToWaypoint * k_angleFactor / PI);
 		return; // TODO
 	}
-
-
+	
 	// move
 	int turnDirection = isMovingForward() ? 1 /* front gear*/ : -1 /* read gear*/;
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor / PI);
 	move.setEnginePower(1);
+
+	bool isNearWaypoint = (self.getDistanceTo(nextWaypoint.x, nextWaypoint.y)) < game.getTrackTileSize() && m_statistics.m_currentSpeed > 15;
+	bool isBigAngleToWaypoint = m_statistics.m_currentSpeed * std::abs(angleToWaypoint) > (10 * PI / 4);
+	
+	// brake before waypoint
+	if (isBigAngleToWaypoint || isNearWaypoint)
+	{
+		move.setBrake(true);
+	}
 }
 
 
