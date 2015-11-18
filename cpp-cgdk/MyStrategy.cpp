@@ -12,14 +12,31 @@
 
 using namespace model;
 
-const double MyStrategy::k_angleFactor = 32.0;
+const double MyStrategy::k_angleFactor = 32.0 / PI;
 
 
 void MyStrategy::move(const Car& self, const World& world, const Game& game, Move& move)
 {
 	updateStates(self, world, game, move);
 
-    move.setEnginePower(1.0);
+	// it's good idea to shoot an enemy...
+	if (self.getProjectileCount() > 0)
+	{
+		auto carToShoot = std::find_if(world.getCars().cbegin(), world.getCars().cend(), [&self, &game](const Car& car)
+		{
+			const double scope = 1 * PI / 180;
+			return !car.isTeammate()
+				&& self.getDistanceTo(car) < game.getTrackTileSize() * 1.5
+				&& std::abs(self.getAngleTo(car)) < scope;
+		});
+
+		if (carToShoot != world.getCars().end())
+		{
+			move.setThrowProjectile(true);
+		}
+	}
+	
+	move.setEnginePower(1.0);
 
 	// get next waypoint
 	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
@@ -57,7 +74,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	if (isWallCollision())
 	{
 		move.setEnginePower(-1);
-		move.setWheelTurn(-2 * angleToWaypoint * k_angleFactor / PI);
+		move.setWheelTurn(-2 * angleToWaypoint * k_angleFactor);
 		return; // TODO
 	}
 
@@ -71,17 +88,17 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	
 	// move
 	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;  //TODO
-	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor / PI);
+	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor);
 	move.setEnginePower(1);
 
-	static const double SAFE_SPEED = 9;
+	static const double SAFE_SPEED = 10;
 
 	int ticksToBrake = 0;
 	double distanceToBrake = 0;
 	simulateBreaking(SAFE_SPEED, ticksToBrake, distanceToBrake);
 	
 	// brake before waypoint
-	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / 7;
+	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / 5;
 	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > SAFE_SPEED)
 	{
 		move.setBrake(true);
@@ -101,20 +118,38 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		}
 	}
 
-	// it's good idea to shoot an enemy...
-	if (self.getProjectileCount() > 0)
+	// may correct angle to pick up some interesting
+	if (isMovingForward() && distanceToWaypoint > game.getTrackTileSize() * 2)
 	{
-		auto carToShoot = std::find_if(world.getCars().cbegin(), world.getCars().cend(), [self, game](const Car& car)
+		auto bonus = std::find_if(world.getBonuses().cbegin(), world.getBonuses().cend(), [&self, &game, &nextWaypoint](const Bonus& bonus)
 		{
-			const double scope = 1 * PI / 180;
-			return !car.isTeammate()
-				&& self.getDistanceTo(car) < game.getTrackTileSize() * 1.5
-				&& std::abs(self.getAngleTo(car)) < scope;
+			double searchScope = 3 * PI / 180;
+			double health = self.getDurability();
+			switch (bonus.getType())
+			{
+			case NITRO_BOOST:
+			case OIL_CANISTER:
+				searchScope *= 2;
+				break;
+
+			case REPAIR_KIT:
+				searchScope *= (health > 0 && health < 0.9) ? std::min(3.0, 1 / health) : 0.5;
+				break;
+
+			default:
+				break;
+			}
+
+			const double relativeDist = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y) - self.getDistanceTo(bonus);
+			const double relativeAngle = std::abs(self.getAngleTo(nextWaypoint.x, nextWaypoint.y) - self.getAngleTo(bonus));
+
+			return std::abs(self.getAngleTo(bonus)) < searchScope
+				&& relativeDist > game.getTrackTileSize();
 		});
 
-		if (carToShoot != world.getCars().end())
+		if (bonus != world.getBonuses().cend())
 		{
-			move.setThrowProjectile(true);
+			move.setWheelTurn(self.getAngleTo(*bonus) * k_angleFactor);
 		}
 	}
 
