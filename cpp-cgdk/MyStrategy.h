@@ -14,6 +14,8 @@ public:
 
 	void move(const model::Car& self, const model::World& world, const model::Game& game, model::Move& move);
 
+	void simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake);
+
 private:
 	struct Statistics
 	{

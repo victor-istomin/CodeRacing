@@ -22,65 +22,38 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
     move.setEnginePower(1.0);
     move.setThrowProjectile(true);
 
-	// oil usage
-	if(self.getOilCanisterCount() > 0)
-	{
-		const int OIL_SPILL_DELAY = 500;
-		int tick = world.getTick();
-		if (m_statistics.m_lastOilTick + OIL_SPILL_DELAY < tick)
-		{
-			move.setSpillOil(true);
-			m_statistics.m_lastOilTick = tick;
-		}
-	}
-
-	/*
-	static bool dbgIsCollisionTest = false;
-	if (!dbgIsCollisionTest)
-	{
-		if (!isWallCollision())
-		{
-			move.setEnginePower(0.5);
-			return;
-		}
-		dbgIsCollisionTest = true;
-	}*/
-
 	// get next waypoint
 	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 	/* optimize cornering */
+	const double FAR = game.getTrackTileSize() * 1.3;
+	double cornerTileOffset = 0.25 * game.getTrackTileSize();
+	int offsetDirection = distanceToWaypoint > FAR ? -1 : 1;
+	TileType tileType = world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()];
+	switch (tileType)
 	{
-		const double FAR = game.getTrackTileSize() * 1.3;
-		double cornerTileOffset = 0.25 * game.getTrackTileSize();
-		int offsetDirection = distanceToWaypoint > FAR ? -1 : 1;
-		TileType tileType = world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()];
-		switch (tileType) 
-		{
-		case LEFT_TOP_CORNER:
-			nextWaypoint.x += cornerTileOffset * offsetDirection;
-			nextWaypoint.y += cornerTileOffset * offsetDirection;
-			break;
-		case RIGHT_TOP_CORNER:
-			nextWaypoint.x -= cornerTileOffset * offsetDirection;
-			nextWaypoint.y += cornerTileOffset * offsetDirection;
-			break;
-		case LEFT_BOTTOM_CORNER:
-			nextWaypoint.x += cornerTileOffset * offsetDirection;
-			nextWaypoint.y -= cornerTileOffset * offsetDirection;
-			break;
-		case RIGHT_BOTTOM_CORNER:
-			nextWaypoint.x -= cornerTileOffset * offsetDirection;
-			nextWaypoint.y -= cornerTileOffset * offsetDirection;
-			break;
-		default:
-			break;
-		}
+	case LEFT_TOP_CORNER:
+		nextWaypoint.x += cornerTileOffset * offsetDirection;
+		nextWaypoint.y += cornerTileOffset * offsetDirection;
+		break;
+	case RIGHT_TOP_CORNER:
+		nextWaypoint.x -= cornerTileOffset * offsetDirection;
+		nextWaypoint.y += cornerTileOffset * offsetDirection;
+		break;
+	case LEFT_BOTTOM_CORNER:
+		nextWaypoint.x += cornerTileOffset * offsetDirection;
+		nextWaypoint.y -= cornerTileOffset * offsetDirection;
+		break;
+	case RIGHT_BOTTOM_CORNER:
+		nextWaypoint.x -= cornerTileOffset * offsetDirection;
+		nextWaypoint.y -= cornerTileOffset * offsetDirection;
+		break;
+	default:
+		break;
 	}
 
 	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
 	distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
-
 
 	if (isWallCollision())
 	{
@@ -98,27 +71,62 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	
 	// move
-	int turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;
+	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;  //TODO
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor / PI);
 	move.setEnginePower(1);
 
+	static const double SAFE_SPEED = 9;
 
-	int  speedModifier = m_statistics.m_currentSpeed > 30 ? 2 : 1;
-	bool isNearWaypoint = distanceToWaypoint < game.getTrackTileSize() * speedModifier && m_statistics.m_currentSpeed > 15;
-	bool isBigAngleToWaypoint = m_statistics.m_currentSpeed * std::abs(angleToWaypoint) > (10 * PI / 4);
+	int ticksToBrake = 0;
+	double distanceToBrake = 0;
+	simulateBreaking(SAFE_SPEED, ticksToBrake, distanceToBrake);
 	
 	// brake before waypoint
-	if (isBigAngleToWaypoint || isNearWaypoint)
+	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / 7;
+	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > SAFE_SPEED)
 	{
 		move.setBrake(true);
 		move.setUseNitro(false);
+	}
+
+	// it's good idea to spill oil before apex 
+	bool isJustBeforeTurn = distanceToWaypoint < game.getTrackTileSize() / 2;
+	if (self.getOilCanisterCount() > 0 && isJustBeforeTurn)
+	{
+		const int OIL_SPILL_DELAY = 300;
+		int tick = world.getTick();
+		if (m_statistics.m_lastOilTick + OIL_SPILL_DELAY < tick)
+		{
+			move.setSpillOil(true);
+			m_statistics.m_lastOilTick = tick;
+		}
 	}
 
 	printFinishStats();
 }
 
 
-MyStrategy::MyStrategy() 
+void MyStrategy::simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake)
+{
+	static const int    ITERATIONS_PER_STEP = 10;
+	static const double INCREMENT = 1.0 / ITERATIONS_PER_STEP;
+
+	ticksToBrake = 0;
+	distanceToBrake = 0;
+	
+	for (double speed = m_statistics.m_currentSpeed; speed > desiredSpeed; speed *= 1.0 - m_game->getCarMovementAirFrictionFactor())
+	{
+		for (int i = 0; i < ITERATIONS_PER_STEP; ++i)
+		{
+			speed -= m_game->getCarCrosswiseMovementFrictionFactor() * INCREMENT;
+			distanceToBrake += speed * INCREMENT;
+		}
+
+		++ticksToBrake;
+	}
+}
+
+MyStrategy::MyStrategy()
 	: m_self(nullptr)
 	, m_world(nullptr)
 	, m_game(nullptr)
@@ -139,10 +147,8 @@ void MyStrategy::updateStates(const model::Car& self, const model::World& world,
 	m_statistics.m_currentSpeed = std::hypot(self.getSpeedX(), self.getSpeedY());
 	m_statistics.m_maxSpeed = std::max(m_statistics.m_maxSpeed, m_statistics.m_currentSpeed);
 
-	if (isFirstTimeInit)
-	{
-		m_statistics.m_lastOilTick = game.getInitialFreezeDurationTicks();
-	}
+	m_statistics.m_sumSpeed += static_cast<uint64_t>(m_statistics.m_currentSpeed);
+
 }
 
 bool MyStrategy::isWallCollision()
@@ -210,5 +216,5 @@ void MyStrategy::Statistics::output(int ticks) const
 		STAT(m_lastEscapeTick)
 		STAT(m_isEscapingCollision)
 		STAT(m_lastOilTick)
-		STAT_COMPUTE("avg speed", m_sumSpeed / ticks);
+		STAT_COMPUTE("avg speed", m_sumSpeed / (double)ticks);
 }
