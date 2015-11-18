@@ -91,7 +91,8 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor);
 	move.setEnginePower(1);
 
-	static const double SAFE_SPEED = 10;
+	bool isVeryCareful = self.getDurability() < 0.3;
+	static const double SAFE_SPEED = isVeryCareful ? 7 : 10;
 
 	int ticksToBrake = 0;
 	double distanceToBrake = 0;
@@ -125,6 +126,8 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		{
 			double searchScope = 3 * PI / 180;
 			double health = self.getDurability();
+			double relativeDist = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y) - self.getDistanceTo(bonus);
+
 			switch (bonus.getType())
 			{
 			case NITRO_BOOST:
@@ -134,17 +137,14 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 			case REPAIR_KIT:
 				searchScope *= (health > 0 && health < 0.9) ? std::min(3.0, 1 / health) : 0.5;
+				relativeDist *= (health > 0 && health < 0.5) ? std::min(2.0, 1 / (health + 0.5)) : 1;
 				break;
 
 			default:
 				break;
 			}
 
-			const double relativeDist = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y) - self.getDistanceTo(bonus);
-			const double relativeAngle = std::abs(self.getAngleTo(nextWaypoint.x, nextWaypoint.y) - self.getAngleTo(bonus));
-
-			return std::abs(self.getAngleTo(bonus)) < searchScope
-				&& relativeDist > game.getTrackTileSize();
+			return std::abs(self.getAngleTo(bonus)) < searchScope && relativeDist > game.getTrackTileSize();
 		});
 
 		if (bonus != world.getBonuses().cend())
