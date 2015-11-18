@@ -41,6 +41,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	// get next waypoint
 	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+
+	bool isPassThruWaypoint = false; // TODO - fixme
+
 	/* optimize cornering */
 	const double FAR = game.getTrackTileSize() * 1.3;
 	double cornerTileOffset = 0.25 * game.getTrackTileSize();
@@ -64,6 +67,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		nextWaypoint.x -= cornerTileOffset * offsetDirection;
 		nextWaypoint.y -= cornerTileOffset * offsetDirection;
 		break;
+	case CROSSROADS:
+		isPassThruWaypoint = true;
+		break;
+
 	default:
 		break;
 	}
@@ -79,7 +86,8 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	}
 
 	int degreesToWaypoint = static_cast<int>(std::abs(angleToWaypoint) * PI / 180);
-	if (world.getTick() > game.getInitialFreezeDurationTicks() && degreesToWaypoint < 10 && distanceToWaypoint > 3 * game.getTrackTileSize())
+	double correctedDistanceToWaypoint = (isPassThruWaypoint ? 1.5 : 1.0) * distanceToWaypoint;   // TODO - fixme
+	if (world.getTick() > game.getInitialFreezeDurationTicks() && degreesToWaypoint < 10 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize())
 	{
 		move.setUseNitro(true);
 	}
@@ -99,14 +107,14 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	
 	// brake before waypoint
 	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / 5;
-	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > SAFE_SPEED)
+	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > SAFE_SPEED && !isPassThruWaypoint)
 	{
 		move.setBrake(true);
 		move.setUseNitro(false);
 	}
 
 	// it's good idea to spill oil before apex 
-	bool isJustBeforeTurn = distanceToWaypoint < game.getTrackTileSize() / 2;
+	bool isJustBeforeTurn = !isPassThruWaypoint && distanceToWaypoint < game.getTrackTileSize() / 2;
 	if (self.getOilCanisterCount() > 0 && isJustBeforeTurn)
 	{
 		const int OIL_SPILL_DELAY = 300;
@@ -119,13 +127,14 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	}
 
 	// may correct angle to pick up some interesting
-	if (isMovingForward() && distanceToWaypoint > game.getTrackTileSize() * 2)
+	if (isMovingForward() && correctedDistanceToWaypoint > game.getTrackTileSize() * 2)
 	{
-		auto bonus = std::find_if(world.getBonuses().cbegin(), world.getBonuses().cend(), [&self, &game, &nextWaypoint](const Bonus& bonus)
+		auto bonus = std::find_if(world.getBonuses().cbegin(), world.getBonuses().cend(), 
+			[&self, &game, &nextWaypoint, correctedDistanceToWaypoint](const Bonus& bonus)
 		{
 			double searchScope = 3 * PI / 180;
 			double health = self.getDurability();
-			double relativeDist = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y) - self.getDistanceTo(bonus);
+			double relativeDist = correctedDistanceToWaypoint - self.getDistanceTo(bonus);
 
 			switch (bonus.getType())
 			{
