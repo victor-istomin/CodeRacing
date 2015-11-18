@@ -79,15 +79,14 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	}
 
 	int degreesToWaypoint = static_cast<int>(std::abs(angleToWaypoint) * PI / 180);
-	if (world.getTick() > game.getInitialFreezeDurationTicks() && ((degreesToWaypoint % 90) < 10)
-		&& distanceToWaypoint > 3 * game.getTrackTileSize())
+	if (world.getTick() > game.getInitialFreezeDurationTicks() && degreesToWaypoint < 10 && distanceToWaypoint > 3 * game.getTrackTileSize())
 	{
 		move.setUseNitro(true);
 	}
 
 	
 	// move
-	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;  //TODO
+	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor);
 	move.setEnginePower(1);
 
