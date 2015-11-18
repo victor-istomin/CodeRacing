@@ -130,11 +130,11 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	if (isMovingForward() && correctedDistanceToWaypoint > game.getTrackTileSize() * 2)
 	{
 		auto bonus = std::find_if(world.getBonuses().cbegin(), world.getBonuses().cend(), 
-			[&self, &game, &nextWaypoint, correctedDistanceToWaypoint](const Bonus& bonus)
+			[&self, &game, &nextWaypoint, distanceToWaypoint](const Bonus& bonus)
 		{
 			double searchScope = 3 * PI / 180;
 			double health = self.getDurability();
-			double relativeDist = correctedDistanceToWaypoint - self.getDistanceTo(bonus);
+			double relativeDist = distanceToWaypoint - self.getDistanceTo(bonus);
 
 			switch (bonus.getType())
 			{
