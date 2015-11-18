@@ -20,7 +20,6 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	updateStates(self, world, game, move);
 
     move.setEnginePower(1.0);
-    move.setThrowProjectile(true);
 
 	// get next waypoint
 	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
@@ -99,6 +98,23 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		{
 			move.setSpillOil(true);
 			m_statistics.m_lastOilTick = tick;
+		}
+	}
+
+	// it's good idea to shoot an enemy...
+	if (self.getProjectileCount() > 0)
+	{
+		auto carToShoot = std::find_if(world.getCars().cbegin(), world.getCars().cend(), [self, game](const Car& car)
+		{
+			const double scope = 1 * PI / 180;
+			return !car.isTeammate()
+				&& self.getDistanceTo(car) < game.getTrackTileSize() * 1.5
+				&& std::abs(self.getAngleTo(car)) < scope;
+		});
+
+		if (carToShoot != world.getCars().end())
+		{
+			move.setThrowProjectile(true);
 		}
 	}
 
