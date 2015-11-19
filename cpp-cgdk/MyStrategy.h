@@ -4,8 +4,10 @@
 #define _MY_STRATEGY_H_
 
 #include "Strategy.h"
+#include "Utils.h"
 #include <cmath>
 #include <cstdint>
+#include <memory>
 
 class MyStrategy : public Strategy 
 {
@@ -39,7 +41,8 @@ private:
 	const model::Game*  m_game;
 	const model::Move*  m_move;
 
-	Statistics m_statistics;
+	Statistics           m_statistics;
+	std::unique_ptr<Map> m_map;
 
 	void updateStates(const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move);
 
