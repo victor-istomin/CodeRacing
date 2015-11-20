@@ -40,7 +40,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setEnginePower(1.0);
 
 	// get next waypoint
-	Point nextWaypoint = Point::fromTileIndex(game, self.getNextWaypointX(), self.getNextWaypointY());
+	Point nextWaypoint = m_map->getTileCenter(self.getNextWaypointX(), self.getNextWaypointY());
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
 	bool isPassThruWaypoint = false; // TODO - fixme
@@ -49,7 +49,8 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	const double FAR = game.getTrackTileSize() * 1.3;
 	double cornerTileOffset = 0.25 * game.getTrackTileSize();
 	int offsetDirection = distanceToWaypoint > FAR ? -1 : 1;
-	TileType tileType = world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()];
+
+	TileType tileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
 	switch (tileType)
 	{
 	case LEFT_TOP_CORNER:
@@ -214,6 +215,9 @@ void MyStrategy::updateStates(const model::Car& self, const model::World& world,
 	m_world = &world;
 	m_game = &game;
 	m_move = &move;
+
+	if (!m_map)
+		m_map.reset(new Map(game, world));
 
 	m_statistics.m_previousSpeed = m_statistics.m_currentSpeed;
 	m_statistics.m_currentSpeed = std::hypot(self.getSpeedX(), self.getSpeedY());
