@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <numeric>
 #include <iostream>
 #include <set>
 
@@ -82,7 +83,16 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	{
 		move.setEnginePower(-1);
 		move.setWheelTurn(-2 * angleToWaypoint * k_angleFactor);
+		move.setUseNitro(false);
 		return; // TODO
+	}
+
+	// apply brake when changing rear/front gear
+	bool wantsForward = self.getEnginePower() >= 0 || move.getEnginePower() > 0;
+	bool isStopped = self.getSpeedX() == 0 && self.getSpeedY() == 0;
+	if (!isStopped && (isMovingForward() != wantsForward))
+	{
+		move.setBrake(true);
 	}
 
 	int degreesToWaypoint = static_cast<int>(std::abs(angleToWaypoint) * PI / 180);
@@ -91,7 +101,6 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	{
 		move.setUseNitro(true);
 	}
-
 	
 	// move
 	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;
@@ -106,7 +115,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	simulateBreaking(SAFE_SPEED, ticksToBrake, distanceToBrake);
 	
 	// brake before waypoint
-	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / 5;
+	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / (isVeryCareful ? 4 : 5);
 	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > SAFE_SPEED && !isPassThruWaypoint)
 	{
 		move.setBrake(true);
@@ -201,8 +210,6 @@ MyStrategy::MyStrategy()
 
 void MyStrategy::updateStates(const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move)
 {
-	bool isFirstTimeInit = m_world == nullptr;
-
 	m_self = &self;
 	m_world = &world;
 	m_game = &game;
@@ -214,33 +221,62 @@ void MyStrategy::updateStates(const model::Car& self, const model::World& world,
 
 	m_statistics.m_sumSpeed += static_cast<uint64_t>(m_statistics.m_currentSpeed);
 
+	if (self.getDurability() > 0 && world.getTick() > game.getInitialFreezeDurationTicks())
+		m_statistics.m_recentSpeeds[world.getTick() % m_statistics.recentSpeedTicks()] = m_statistics.m_currentSpeed; 
 }
 
 bool MyStrategy::isWallCollision()
 {
-	static const double STOPPED   = 6;
+	if (m_self->isFinishedTrack())
+		return false;
+
+	static const double STOPPED   = 7;
 	static const int    TICKS_GAP = 85;
+	static const int    COLLIDE_INTERVAL = 160;
+	static const int    COOLDOWN_TICKS = 20;
+	static const double MIN_AVERAGE_SPEED = 1.5;
 
 	int currentTick = m_world->getTick();
-	bool isJustEscaped = (currentTick - m_statistics.m_lastEscapeTick) < TICKS_GAP;
+	int ticksSinceCollide = currentTick - m_statistics.m_lastWallCollisionTick;
+	int ticksSinceEscape = currentTick - m_statistics.m_lastCollisionEscapeTick;
+	int ticksEscaping = m_statistics.m_isEscapingCollision ? ticksSinceCollide : TICKS_GAP;
+	bool isJustEscaped = ticksEscaping < TICKS_GAP;
 
 	if (!m_statistics.m_isEscapingCollision)
 	{
-		if (m_statistics.m_previousSpeed > m_statistics.m_currentSpeed * 3 && isMovingForward() && !isJustEscaped)
+		bool isJustCollide =  currentTick < (m_game->getInitialFreezeDurationTicks() + m_statistics.recentSpeedTicks())
+		                   || currentTick < (m_statistics.m_lastWallCollisionTick + m_statistics.recentSpeedTicks());
+
+		bool isSlow = !isJustCollide && ticksSinceEscape > COLLIDE_INTERVAL && m_statistics.recentSpeed() < MIN_AVERAGE_SPEED;
+
+		if (isMovingForward() && !isJustEscaped && ticksSinceCollide > COLLIDE_INTERVAL &&
+			(   (m_statistics.m_previousSpeed > STOPPED && m_statistics.m_previousSpeed > m_statistics.m_currentSpeed * 4) 
+		      || isSlow
+			))
 		{
 			m_statistics.m_isEscapingCollision = true;
-			m_statistics.m_lastEscapeTick = currentTick;
+			m_statistics.m_lastWallCollisionTick = currentTick;
 			return true;
 		}
 	}
 	else // escaping from collision
 	{ 
-		if (m_statistics.m_currentSpeed < STOPPED)
+		if (ticksEscaping < COOLDOWN_TICKS)
 		{
-			return isJustEscaped; // still escaping
+			// may be small rebound from wall, not really escaped, need cooldown
+			return true;
 		}
-		else
+		else if (isJustEscaped || 
+			(m_statistics.m_currentSpeed < STOPPED && ticksSinceCollide < COLLIDE_INTERVAL))
 		{
+			return true; // still escaping
+		}
+		else 
+		{
+			// TODO - this is workaround 
+			std::fill(std::begin(m_statistics.m_recentSpeeds), std::end(m_statistics.m_recentSpeeds), m_statistics.m_currentSpeed * 3);
+
+			m_statistics.m_lastCollisionEscapeTick = currentTick;
 			m_statistics.m_isEscapingCollision = false;
 			m_statistics.m_previousSpeed = STOPPED;
 			return false;
@@ -269,6 +305,13 @@ void MyStrategy::printFinishStats() const
 #endif
 }
 
+MyStrategy::Statistics::Statistics()
+	: m_maxSpeed(0), m_currentSpeed(0), m_previousSpeed(0), m_lastWallCollisionTick(0), m_lastCollisionEscapeTick(0), m_lastOilTick(0), m_sumSpeed(0)
+	, m_isEscapingCollision(false) 
+{
+	std::fill(std::begin(m_recentSpeeds), std::end(m_recentSpeeds), 30.0); // prevent false collision detecting on game start
+}
+
 void MyStrategy::Statistics::output(int ticks) const
 {
 #define STAT(name)                << "  " #name << ": " << name << "; " << std::endl
@@ -278,7 +321,7 @@ void MyStrategy::Statistics::output(int ticks) const
 		STAT(m_maxSpeed)
 		STAT(m_currentSpeed)
 		STAT(m_previousSpeed)
-		STAT(m_lastEscapeTick)
+		STAT(m_lastWallCollisionTick)
 		STAT(m_isEscapingCollision)
 		STAT(m_lastOilTick)
 		STAT_COMPUTE("avg speed", m_sumSpeed / (double)ticks);

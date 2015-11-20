@@ -6,6 +6,8 @@
 #include "Strategy.h"
 #include <cmath>
 #include <cstdint>
+#include <numeric>
+#include <type_traits>
 
 class MyStrategy : public Strategy 
 {
@@ -19,17 +21,23 @@ public:
 private:
 	struct Statistics
 	{
-		Statistics() : m_maxSpeed(0), m_currentSpeed(0), m_previousSpeed(0), m_lastEscapeTick(0), m_lastOilTick(0), m_sumSpeed(0), m_isEscapingCollision(false) {}
+		Statistics();
 
 		double   m_maxSpeed;
 		double   m_currentSpeed;
 		double   m_previousSpeed;
-		int      m_lastEscapeTick;
+		int      m_lastWallCollisionTick;
+		int      m_lastCollisionEscapeTick;
 		bool     m_isEscapingCollision;
 		int      m_lastOilTick;
 		uint64_t m_sumSpeed;
 
-		void output(int ticks) const;
+		double m_recentSpeeds[30];
+
+		void output(int ticks)    const;
+
+		double recentSpeed()      const { return std::accumulate(std::begin(m_recentSpeeds), std::end(m_recentSpeeds), 0.0) / recentSpeedTicks(); }
+		int    recentSpeedTicks() const { return std::extent<decltype(m_recentSpeeds)>::value; }
 	};
 
 	static const double k_angleFactor;
