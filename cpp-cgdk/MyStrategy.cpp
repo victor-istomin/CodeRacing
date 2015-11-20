@@ -50,8 +50,8 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	double cornerTileOffset = 0.25 * game.getTrackTileSize();
 	int offsetDirection = distanceToWaypoint > FAR ? -1 : 1;
 
-	TileType tileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
-	switch (tileType)
+	TileType waypointTileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
+	switch (waypointTileType)
 	{
 	case LEFT_TOP_CORNER:
 		nextWaypoint.x += cornerTileOffset * offsetDirection;
@@ -72,6 +72,40 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	case CROSSROADS:
 		isPassThruWaypoint = true;
 		break;
+
+	case TOP_HEADED_T:
+	{
+		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
+		nextWaypoint = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
+		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+
+		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
+		{
+			nextWaypoint = nextWaypoint + Point(1.3 * m_game->getTrackTileSize(), m_game->getTrackTileSize() - margin);
+		}
+		else
+		{ 
+			nextWaypoint = nextWaypoint + Point(0.5 * m_game->getTrackTileSize(), 0.5 * m_game->getTrackTileSize());
+		}
+		break;
+	}
+
+	case RIGHT_HEADED_T:
+	{
+		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
+		nextWaypoint = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
+		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+
+		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
+		{
+			nextWaypoint = nextWaypoint + Point(margin, 1.4 * m_game->getTrackTileSize());
+		}
+		else
+		{
+			nextWaypoint = nextWaypoint + Point(m_game->getTrackTileSize() + margin, m_game->getTrackTileSize() - margin);
+		}
+		break;
+	}
 
 	default:
 		break;
@@ -98,7 +132,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	int degreesToWaypoint = static_cast<int>(std::abs(angleToWaypoint) * PI / 180);
 	double correctedDistanceToWaypoint = (isPassThruWaypoint ? 1.5 : 1.0) * distanceToWaypoint;   // TODO - fixme
-	if (world.getTick() > game.getInitialFreezeDurationTicks() && degreesToWaypoint < 10 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize())
+	if (world.getTick() > game.getInitialFreezeDurationTicks() 
+		&& degreesToWaypoint < 10 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize()
+		&& waypointTileType != TOP_HEADED_T
+		&& waypointTileType != RIGHT_HEADED_T)
 	{
 		move.setUseNitro(true);
 	}
@@ -108,7 +145,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor);
 	move.setEnginePower(1);
 
-	bool isVeryCareful = self.getDurability() < 0.3;
+	bool isVeryCareful = self.getDurability() < 0.3 || waypointTileType == RIGHT_HEADED_T || waypointTileType == TOP_HEADED_T;
 	static const double SAFE_SPEED = isVeryCareful ? 7 : 10;
 
 	int ticksToBrake = 0;
