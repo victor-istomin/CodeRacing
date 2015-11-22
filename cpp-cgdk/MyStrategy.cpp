@@ -130,10 +130,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		move.setBrake(true);
 	}
 
-	int degreesToWaypoint = static_cast<int>(std::abs(angleToWaypoint) * PI / 180);
+	double degreesToWaypoint = static_cast<int>(std::abs(angleToWaypoint) * 180 / PI);
 	double correctedDistanceToWaypoint = (isPassThruWaypoint ? 1.5 : 1.0) * distanceToWaypoint;   // TODO - fixme
 	if (world.getTick() > game.getInitialFreezeDurationTicks() 
-		&& degreesToWaypoint < 10 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize()
+		&& degreesToWaypoint < 10.0 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize()
 		&& waypointTileType != TOP_HEADED_T
 		&& waypointTileType != RIGHT_HEADED_T)
 	{
