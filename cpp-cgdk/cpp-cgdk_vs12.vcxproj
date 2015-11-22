@@ -87,6 +87,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Debug.cpp" />
     <ClCompile Include="MyStrategy.cpp" />
     <ClCompile Include="RemoteProcessClient.cpp" />
     <ClCompile Include="Runner.cpp" />
@@ -109,6 +110,7 @@
     <ClCompile Include="model\RectangularUnit.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DebugVisualizer.h" />
     <ClInclude Include="MyStrategy.h" />
     <ClInclude Include="RemoteProcessClient.h" />
     <ClInclude Include="Runner.h" />

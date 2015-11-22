@@ -12,13 +12,12 @@
 #include <set>
 
 using namespace model;
-
 const double MyStrategy::k_angleFactor = 32.0 / PI;
-
 
 void MyStrategy::move(const Car& self, const World& world, const Game& game, Move& move)
 {
 	updateStates(self, world, game, move);
+	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move);
 
 	// it's good idea to shoot an enemy...
 	if (self.getProjectileCount() > 0)
@@ -113,6 +112,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
 	distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+	debug.m_destination = nextWaypoint;
 
 	if (isWallCollision())
 	{

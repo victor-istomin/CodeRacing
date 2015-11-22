@@ -3,6 +3,7 @@
 #include "model/World.h"
 #include <vector>
 
+
 struct Point
 {
 	double x;
