@@ -145,7 +145,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor);
 	move.setEnginePower(1);
 
-	bool isVeryCareful = self.getDurability() < 0.3 || waypointTileType == RIGHT_HEADED_T || waypointTileType == TOP_HEADED_T;
+	bool isVeryCareful = self.getDurability() < 0.3 
+		|| waypointTileType == RIGHT_HEADED_T || waypointTileType == TOP_HEADED_T || waypointTileType == LEFT_HEADED_T || waypointTileType == BOTTOM_HEADED_T;
+
 	static const double SAFE_SPEED = isVeryCareful ? 7 : 10;
 
 	int ticksToBrake = 0;

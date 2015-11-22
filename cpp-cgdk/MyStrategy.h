@@ -3,19 +3,6 @@
 #ifndef _MY_STRATEGY_H_
 #define _MY_STRATEGY_H_
 
-#ifdef _DEBUG
-# include "DebugVisualizer.h"
-#else
-struct DebugVisualizer 
-{
-	void preRenderStart()  { }
-	void preRenderFinish() { }
-
-	void renderWypoints(const Map& map, const model::Game& game, model::World& world, const model::Car& self) {}
-	void renderMoveTarget(const model::Car& self, const model::Move& move, const Point& destination)          {}
-};
-#endif
-
 #include "Strategy.h"
 #include "Utils.h"
 #include <cmath>
@@ -23,6 +10,46 @@ struct DebugVisualizer
 #include <numeric>
 #include <type_traits>
 #include <memory>
+
+#ifdef _DEBUG
+# include "DebugVisualizer.h"
+#else
+struct DebugVisualizer
+{
+	void preRenderStart() { }
+	void preRenderFinish() { }
+
+	void renderWypoints(const Map& map, const model::Game& game, const model::World& world, const model::Car& self) {}
+	void renderMoveTarget(const model::Car& self, const model::Move& move, const Point& destination) {}
+};
+#endif
+
+struct DebugMessage
+{
+	DebugVisualizer&    m_v;
+
+	const Map&          m_map;
+	const model::Car&   m_self;
+	const model::World& m_world;
+	const model::Game&  m_game;
+	const model::Move&  m_move;
+
+	Point m_destination;
+
+	DebugMessage(DebugVisualizer& v, const Map& map, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move)
+		: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move)
+	{
+	}
+
+	~DebugMessage()
+	{
+		// pre-render block
+		m_v.preRenderStart();
+		m_v.renderWypoints(m_map, m_game, m_world, m_self);
+		m_v.renderMoveTarget(m_self, m_move, m_destination);
+		m_v.preRenderFinish();
+	}
+};
 
 class MyStrategy : public Strategy 
 {
