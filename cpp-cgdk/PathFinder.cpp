@@ -14,26 +14,24 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 	Map& map = m_map;
 	std::hash<int> intHash;
 
-	auto nodeHasher = [&map, &intHash](const Node* n)  { return intHash(map.nodeToIndex(*n)); };
-	auto nodeEquals = [](const Node* a, const Node* b) { return *a == *b; };
-
 	typedef std::map<double/*cost*/, Node*> CostNodeMap;
-	typedef std::unordered_set<Node*, decltype(nodeHasher), decltype(nodeEquals)> ClosedNodes;
+	typedef std::unordered_set<Node*, decltype(nodeHasher), decltype(nodeEquals)> ClosedNodes;   // nodes array is fixed size. It's ok to work woth pointers here
 
 	ClosedNodes closedSet = ClosedNodes(1, nodeHasher, nodeEquals);
 
+	/*** test node-point conversion 
 	size_t dbgIndex = map.getNodeIndex(10, 10);
 	Node* dbgNode = map.getNodePtr(dbgIndex);
 	Node* dbgNode2 = map.getNodePtr(10, 10);
 	PointD dbgPoint = map.nodeToPoint(*dbgNode);
 	Node* dbgNode3 = map.getNodePtr(dbgPoint);
 	PointD dbgPoint2 = map.nodeToPoint(*dbgNode3);
-
+	***/
 
 	Node* start = map.getNodePtr(from);
-	PointD dbg = map.nodeToPoint(*start);
-
 	start->m_hx = map.getHeuristicsTo(*start, to);
+	start->m_gx = 0;
+
 	map.isNodePassable(*start);
 
 	CostNodeMap openSet;
@@ -65,36 +63,33 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 		// add neighbors to open list
 
-		map.fillNeighbors(*currentNode, [&map, &currentNode, &to, &openSet, &closedSet](Node& next)
+		map.fillNeighbors(*currentNode, [&map, &currentNode, &to, &openSet, &closedSet](Node* candidate)
 		{
-			if (&next == currentNode || &next == currentNode->m_cachedParent)
+			if (candidate == currentNode || candidate == currentNode->m_cachedParent)
 				return false;
 
-			next.m_gx           = currentNode->m_gx + map.getTransitionCost(*currentNode, next);
-			next.m_hx           = map.getHeuristicsTo(next, to);
-			next.m_cachedParent = currentNode;
+			double newGx = currentNode->m_gx + map.getTransitionCost(*currentNode, *candidate);
+			double newHx = map.getHeuristicsTo(candidate, to); // TODO (!) - clarify Node/Point conversion!
+			double newFx = newGx + newHx;
+			//candidate->m_cachedParent = currentNode;
 
-			std::cout << "dbg: opened (" << next.m_pos.x << ", " << next.m_pos.y << "); parent: " << std::hex << next.m_cachedParent << std::dec << std::endl;
 
 			/* dbg duplicate detection */
-			dbgDuplicateCheck(&next);
+			dbgDuplicateCheck(candidate);
 
-			ClosedNodes::iterator found = closedSet.find(&next);
-			if (found != closedSet.end()) // incorrect pointers logic?
-			{
-				Node* previousResult = *found;
-				if (previousResult->fx() > next.fx())
-				{
-					// improvement, forget old result
-					*previousResult = next;
-					openSet[next.fx()] = previousResult;
-				}
+			bool isAlreadyClosed = closedSet.find(candidate) != closedSet.end();
+			if (isAlreadyClosed && candidate->fx() <= newFx)
+				return;
 
-				dbgDuplicateCheck(&next);
-				return false; // already added
-			}
+			std::cout << "dbg: opened (" << candidate->m_pos.x << ", " << candidate->m_pos.y << "); parent: " << std::hex << candidate->m_cachedParent << std::dec << std::endl;
 
-			openSet[next.fx()] = &next;
+			// update stats only if new path through close node is shorter
+
+			candidate->m_gx = newGx;
+			candidate->m_hx = newHx;
+			candidate->m_cachedParent = currentNode;
+
+			openSet[candidate->fx()] = candidate;
 			return true;
 		});
 	}
