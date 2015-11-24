@@ -135,7 +135,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	if (world.getTick() > game.getInitialFreezeDurationTicks() 
 		&& degreesToWaypoint < 10.0 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize()
 		&& waypointTileType != TOP_HEADED_T
-		&& waypointTileType != RIGHT_HEADED_T)
+		&& waypointTileType != RIGHT_HEADED_T
+	    	&& waypointTileType != LEFT_HEADED_T  
+		&& waypointTileType != BOTTOM_HEADED_T
+	   )
 	{
 		move.setUseNitro(true);
 	}
