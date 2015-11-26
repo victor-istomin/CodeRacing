@@ -214,7 +214,7 @@ void MyStrategy::shootEnemy(Move &move)
 	// it's good idea to shoot an enemy...
 	if (m_self->getProjectileCount() > 0)
 	{
-		auto carToShoot = std::find_if(m_worlt.getCars().cbegin(), m_worlt.getCars().cend(), [this](const Car& car)
+		auto carToShoot = std::find_if(m_world->getCars().cbegin(), m_world->getCars().cend(), [this](const Car& car)
 		{
 			const double scope = 1 * PI / 180;
 			return !car.isTeammate()
