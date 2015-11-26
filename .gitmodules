@@ -1,3 +1,6 @@
 [submodule "notreal2d"]
 	path = notreal2d
 	url = git@github.com:Russian-AI-Cup/notreal2d.git
+[submodule "MicroPather"]
+	path = MicroPather
+	url = git@github.com:leethomason/MicroPather.git

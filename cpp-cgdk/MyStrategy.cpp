@@ -1,8 +1,12 @@
 #include "MyStrategy.h"
 #include "Utils.h"
+#include "Map.h"
+#include "PathFinder.h"
 
 #define PI 3.14159265358979323846
 #define _USE_MATH_DEFINES
+const double PointD::k_epsilon = 0.001;
+
 
 #include <cmath>
 #include <cstdlib>
@@ -17,7 +21,7 @@ const double MyStrategy::k_angleFactor = 32.0 / PI;
 void MyStrategy::move(const Car& self, const World& world, const Game& game, Move& move)
 {
 	updateStates(self, world, game, move);
-	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move);
+	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move, *m_pathFinder);
 
 	// it's good idea to shoot an enemy...
 	if (self.getProjectileCount() > 0)
@@ -39,7 +43,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setEnginePower(1.0);
 
 	// get next waypoint
-	Point nextWaypoint = m_map->getTileCenter(self.getNextWaypointX(), self.getNextWaypointY());
+	PointD tmp = m_map->getTileCenter(self.getNextWaypointX(), self.getNextWaypointY());
+	PointD nextWaypoint = PointD(tmp.x, tmp.y);
+
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
 	bool isPassThruWaypoint = false; // TODO - fixme
@@ -68,6 +74,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		nextWaypoint.x -= cornerTileOffset * offsetDirection;
 		nextWaypoint.y -= cornerTileOffset * offsetDirection;
 		break;
+
+	case HORIZONTAL:
+	case VERTICAL:
 	case CROSSROADS:
 		isPassThruWaypoint = true;
 		break;
@@ -75,16 +84,17 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	case TOP_HEADED_T:
 	{
 		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
-		nextWaypoint = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
+		tmp = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
+		nextWaypoint = PointD(tmp.x, tmp.y);
 		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
 		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
 		{
-			nextWaypoint = nextWaypoint + Point(1.3 * m_game->getTrackTileSize(), m_game->getTrackTileSize() - margin);
+			nextWaypoint = nextWaypoint + PointD(1.3 * m_game->getTrackTileSize(), m_game->getTrackTileSize() - margin);
 		}
 		else
 		{ 
-			nextWaypoint = nextWaypoint + Point(0.5 * m_game->getTrackTileSize(), 0.5 * m_game->getTrackTileSize());
+			nextWaypoint = nextWaypoint + PointD(0.5 * m_game->getTrackTileSize(), 0.5 * m_game->getTrackTileSize());
 		}
 		break;
 	}
@@ -92,16 +102,17 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	case RIGHT_HEADED_T:
 	{
 		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
-		nextWaypoint = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
+		tmp = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
+		nextWaypoint = PointD(tmp.x, tmp.y);
 		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
 		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
 		{
-			nextWaypoint = nextWaypoint + Point(margin, 1.4 * m_game->getTrackTileSize());
+			nextWaypoint = nextWaypoint + PointD(margin, 1.4 * m_game->getTrackTileSize());
 		}
 		else
 		{
-			nextWaypoint = nextWaypoint + Point(m_game->getTrackTileSize() + margin, m_game->getTrackTileSize() - margin);
+			nextWaypoint = nextWaypoint + PointD(m_game->getTrackTileSize() + margin, m_game->getTrackTileSize() - margin);
 		}
 		break;
 	}
@@ -260,6 +271,11 @@ void MyStrategy::updateStates(const model::Car& self, const model::World& world,
 
 	if (!m_map)
 		m_map.reset(new Map(game, world));
+	else
+		m_map->update(game, world);
+
+	if (!m_pathFinder)
+		m_pathFinder.reset(new PathFinder(*m_map));
 
 	m_statistics.m_previousSpeed = m_statistics.m_currentSpeed;
 	m_statistics.m_currentSpeed = std::hypot(self.getSpeedX(), self.getSpeedY());

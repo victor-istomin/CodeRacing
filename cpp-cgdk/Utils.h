@@ -2,50 +2,46 @@
 #include "model/Game.h"
 #include "model/World.h"
 #include <vector>
+#include <array>
+#include <cmath>
 
-
-struct Point
+struct PointD
 {
 	double x;
 	double y;
 
-	explicit Point(double px = 0, double py = 0) : x(px), y(py) {}
+	static const double k_epsilon;
 
-	Point operator*(double m)       const { return Point(x * m, y*m); }
-	Point operator+(const Point& r) const { return Point(x + r.x, y + r.y); }
+	explicit PointD(double px = 0, double py = 0) : x(px), y(py) {}
 
+	PointD operator*(double m)       const { return PointD(x * m, y * m); }
+	PointD operator/(double m)       const { return PointD(x / m, y / m); }
+	PointD operator+(const PointD& r) const { return PointD(x + r.x, y + r.y); }
+	PointD operator-(const PointD& r) const { return PointD(x - r.x, y - r.y); }
+
+	double distanceTo(const PointD& p) const { PointD diff = *this - p; return std::hypot(diff.x, diff.y); }
+
+
+	bool operator==(const PointD& p) const { return std::abs(x - p.x) < k_epsilon && std::abs(y - p.y) < k_epsilon; }
 };
 
-
-class Map
+struct PointI
 {
-	typedef std::vector< std::vector< model::TileType > > TilesXY;
+	int x;
+	int y;
 
-	TilesXY             m_tiles;
-	const model::Game*  m_game;
-	const model::World* m_world;
-	const double        m_tileSize;
-	const Point         m_tileCenter;
+	explicit PointI(int px = 0, int py = 0) : x(px), y(py) {}
+	//explicit PointI(const PointI& p) : x(static_cast<int>(p.x)), y(static_cast<int>(p.y)) {}
 
-public:
-	Map(const model::Game& game, const model::World& world)
-		: m_tiles(world.getTilesXY())
-		, m_game(&game)
-		, m_world(&world)
-		, m_tileSize(m_game->getTrackTileSize())
-		, m_tileCenter(m_game->getTrackTileSize() / 2, m_game->getTrackTileSize() / 2)
-	{
-	}
 
-	void update(const model::Game& game, const model::World& world)
-	{
-		m_game  = &game;
-		m_world = &world;
-		m_tiles = world.getTilesXY();  // optimize and use reference or single array?
-	}
+	PointI operator*(double m)       const { return PointI(static_cast<int>(x * m), static_cast<int>(y * m)); }
+	PointI operator/(double m)       const { return PointI(static_cast<int>(x / m), static_cast<int>(y / m)); }
+	PointI operator+(const PointI& r) const { return PointI(static_cast<int>(x + r.x), static_cast<int>(y + r.y)); }
+	PointI operator-(const PointI& r) const { return PointI(static_cast<int>(x - r.x), static_cast<int>(y - r.y)); }
 
-	model::TileType getTileType(int x, int y)   const { return m_tiles[x][y]; }
-	Point           getTileCorner(int x, int y) const { return Point(x * m_tileSize, y * m_tileSize); }
-	Point           getTileCenter(int x, int y) const { return getTileCorner(x, y) + m_tileCenter; }
+	double distanceTo(const PointI& p) const { PointI diff = *this - p; return std::hypot(diff.x, diff.y); }
+
+	bool operator==(const PointI& p) const { return x == p.x && y == p.y; }
 };
+
 

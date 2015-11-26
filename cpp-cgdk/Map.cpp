@@ -30,8 +30,8 @@ void Map::updateNodes()
 			Node& node = m_nodes[getNodeIndex(x, y)];
 			node.m_pos = PointD(x, y);
 			node.m_isPassable = isNodePassable(node);
-			node.m_gx = node.m_hx = 0;
 			node.m_cachedParent = nullptr;
+			node.m_cachedTransitionCost = 0;
 			// TODO - cars, etc...
 		}
 	}
@@ -162,15 +162,31 @@ PointD Map::incrementNodeIndex(const PointD& point, Direction intcrementTo)
 	return incremented;
 }
 
+double Map::getCostFromStart(const Node& node) const
+{
+	double cost = 0;
+	const Node* current = &node;
+	const Node* parent = current->m_cachedParent;
+
+	while (parent != nullptr)
+	{
+		cost += current->m_cachedTransitionCost;
+		current = parent;
+		parent = current->m_cachedParent;
+	}
+
+	return cost;
+}
+
 double Map::getTransitionCost(const Node& from, const Node& neighbour) const
 {
-	PointD diff = nodeToPoint(from) - nodeToPoint(neighbour);
+	PointD diff = from.m_pos - neighbour.m_pos;
 	return std::hypot(diff.x, diff.y); // TODO - cars, obstacles, angle, etc.
 }
 
-double Map::getHeuristicsTo(const Node& node, const PointD& goal) const
+double Map::getHeuristicsTo(const Node& node, const Node& goal) const
 {
-	PointD diff = nodeToPoint(node) - goal;
+	PointD diff = node.m_pos - goal.m_pos;
 	return std::hypot(diff.x, diff.y); // TODO - cars, obstacles, angle, etc.
 }
 

@@ -12,12 +12,11 @@
 PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 {
 	Map& map = m_map;
-	std::hash<int> intHash;
 
-	typedef std::map<double/*cost*/, Node*> CostNodeMap;
-	typedef std::unordered_set<Node*, decltype(nodeHasher), decltype(nodeEquals)> ClosedNodes;   // nodes array is fixed size. It's ok to work woth pointers here
+	typedef std::multimap<double/*cost*/, Node*> CostNodeMap;
+	typedef std::unordered_set<Node*> HashedNodes;   // nodes array is fixed size. It's ok to work woth pointers here
 
-	ClosedNodes closedSet = ClosedNodes(1, nodeHasher, nodeEquals);
+	HashedNodes closedSet;
 
 	/*** test node-point conversion 
 	size_t dbgIndex = map.getNodeIndex(10, 10);
@@ -29,13 +28,19 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 	***/
 
 	Node* start = map.getNodePtr(from);
-	start->m_hx = map.getHeuristicsTo(*start, to);
-	start->m_gx = 0;
+	Node* finish = map.getNodePtr(to);
+	start->m_hx = map.getHeuristicsTo(*start, *finish);
+	finish->m_hx = 0;
 
-	map.isNodePassable(*start);
+	map.isNodePassable(*start); // not needed?
+
+	assert(start->m_isPassable);
+	assert(finish->m_isPassable);
 
 	CostNodeMap openSet;
-	openSet[start->fx()] = start;
+	HashedNodes openSetHash;
+	openSet.insert( std::make_pair(start->m_hx, start) );
+	openSetHash.insert(start);
 
 	Path path;
 	
@@ -45,6 +50,7 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 		closedSet.insert(currentNode);
 		openSet.erase(openSet.begin());
+		openSetHash.erase(currentNode);
 
 		// reconstruct path if at goal position
 
@@ -54,6 +60,9 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 			Node* previousNode = currentNode;
 			while (previousNode != nullptr)
 			{
+				/*** dbg ***/
+				double gx = map.getCostFromStart(*previousNode);
+				/*** dbg ***/
 				path.push_front(map.nodeToPoint(*previousNode));
 				previousNode = previousNode->m_cachedParent;
 			}
@@ -63,49 +72,56 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 		// add neighbors to open list
 
-		map.fillNeighbors(*currentNode, [&map, &currentNode, &to, &openSet, &closedSet](Node* candidate)
+		map.fillNeighbors(*currentNode, 
+			[&map, &currentNode, &finish, &openSet, &openSetHash, &closedSet](Node* candidate, double currentGx)
 		{
 			if (candidate == currentNode || candidate == currentNode->m_cachedParent)
-				return false;
-
-			double newGx = currentNode->m_gx + map.getTransitionCost(*currentNode, *candidate);
-			double newHx = map.getHeuristicsTo(candidate, to); // TODO (!) - clarify Node/Point conversion!
-			double newFx = newGx + newHx;
-			//candidate->m_cachedParent = currentNode;
-
-
-			/* dbg duplicate detection */
-			dbgDuplicateCheck(candidate);
-
-			bool isAlreadyClosed = closedSet.find(candidate) != closedSet.end();
-			if (isAlreadyClosed && candidate->fx() <= newFx)
 				return;
 
-			std::cout << "dbg: opened (" << candidate->m_pos.x << ", " << candidate->m_pos.y << "); parent: " << std::hex << candidate->m_cachedParent << std::dec << std::endl;
+			double newTransitionCost = map.getTransitionCost(*currentNode, *candidate);
+			double newGx = currentGx + newTransitionCost;
+			double newHx = map.getHeuristicsTo(*candidate, *finish); // TODO (!) - clarify Node/Point conversion!
+			double newFx = newGx + newHx;
+
+			bool isAlreadyOpened = openSetHash.find(candidate) != openSetHash.end();
+			bool isAlreadyClosed = closedSet.find(candidate)   != closedSet.end();
+			bool isAlreadySeen = isAlreadyOpened || isAlreadyClosed;
+			double candidateOldGx = map.getCostFromStart(*candidate);
+			if (isAlreadySeen && candidateOldGx <= newGx)
+			{
+				return;
+			}
+			else if (isAlreadyClosed)
+			{
+				double costKey = candidateOldGx + candidate->m_hx;
+				CostNodeMap::iterator found = openSet.lower_bound(costKey);
+				while (found != openSet.end() && found->first == costKey)  // TODO: epsilon?
+				{
+					CostNodeMap::iterator next = found;
+					++next;
+
+					if (found->second == candidate)
+					{
+						openSetHash.erase(found->second);
+						openSet.erase(found);
+					}
+
+					found = next;
+				}
+			}
 
 			// update stats only if new path through close node is shorter
 
-			candidate->m_gx = newGx;
-			candidate->m_hx = newHx;
-			candidate->m_cachedParent = currentNode;
+			candidate->m_hx                   = newHx;
+			candidate->m_cachedTransitionCost = newTransitionCost;
+			candidate->m_cachedParent         = currentNode;			
 
-			openSet[candidate->fx()] = candidate;
-			return true;
+			openSet.insert( std::make_pair(newFx, candidate) );
+			openSetHash.insert(candidate);
+			return;
 		});
 	}
 
 	return path;
 }
 
-void PathFinder::dbgDuplicateCheck(Node* dbgPoint1)
-{
-	std::set<Node*> existing;
-	while (dbgPoint1->m_cachedParent != nullptr)
-	{
-		if (existing.find(dbgPoint1->m_cachedParent) != existing.end())
-			assert(0);
-
-		existing.insert(dbgPoint1->m_cachedParent);
-		dbgPoint1->m_cachedParent = dbgPoint1->m_cachedParent->m_cachedParent;
-	}
-}

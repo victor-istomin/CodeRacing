@@ -11,6 +11,9 @@
 #include <type_traits>
 #include <memory>
 
+class Map;
+class PathFinder;
+
 #ifdef _DEBUG
 # include "DebugVisualizer.h"
 #else
@@ -20,7 +23,7 @@ struct DebugVisualizer
 	void preRenderFinish() { }
 
 	void renderWypoints(const Map& map, const model::Game& game, const model::World& world, const model::Car& self) {}
-	void renderMoveTarget(const model::Car& self, const model::Move& move, const Point& destination) {}
+	void renderMoveTarget(const model::Car& self, const model::Move& move, const PointD& destination) {}
 };
 #endif
 
@@ -33,11 +36,14 @@ struct DebugMessage
 	const model::World& m_world;
 	const model::Game&  m_game;
 	const model::Move&  m_move;
+	PathFinder&         m_pf;    // todo - const?
 
-	Point m_destination;
+	PointD m_destination;
 
-	DebugMessage(DebugVisualizer& v, const Map& map, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move)
-		: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move)
+	DebugMessage(DebugVisualizer& v, const Map& map
+		, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move
+		, PathFinder& pf)
+			: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move), m_pf(pf)
 	{
 	}
 
@@ -47,6 +53,8 @@ struct DebugMessage
 		m_v.preRenderStart();
 		m_v.renderWypoints(m_map, m_game, m_world, m_self);
 		m_v.renderMoveTarget(m_self, m_move, m_destination);
+		m_v.renderPath(m_pf, m_self, m_destination);
+
 		m_v.preRenderFinish();
 	}
 };
@@ -89,10 +97,11 @@ private:
 	const model::Game*  m_game;
 	const model::Move*  m_move;
 
-	Statistics           m_statistics;
-	std::unique_ptr<Map> m_map;
+	Statistics                  m_statistics;
+	std::unique_ptr<Map>        m_map;
+	std::unique_ptr<PathFinder> m_pathFinder;
 
-	DebugVisualizer      m_debug;
+	DebugVisualizer       m_debug;
 
 	void updateStates(const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move);
 

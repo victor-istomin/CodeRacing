@@ -18,7 +18,4 @@ public:
 
 	Path getPath(const PointD& from, const PointD& to);
 
-	static void dbgDuplicateCheck(Node* dbgPoint1);
-
-
 };

@@ -1,17 +1,16 @@
 #pragma once
 #include "Utils.h"
-
 struct Node
 {
 	PointD m_pos;
 	Node*  m_cachedParent;
 	bool   m_isPassable;
 
-	double m_gx; // g(x) = 'start -> this' cost
+	//double m_gx; // g(x) = 'start -> this' cost
+	double m_cachedTransitionCost;
 	double m_hx; // h(x) = 'this -> goal' heuristics estimate cost
 
-	explicit Node(const PointD& p = PointD(0,0)) : m_pos(p), m_cachedParent(nullptr), m_gx(0), m_hx(0) {}
-	double fx() const { return m_gx + m_hx; } // f(x) = g(x) + h(x)
+	explicit Node(const PointD& p = PointD(0,0)) : m_pos(p), m_cachedParent(nullptr), m_cachedTransitionCost(0), m_hx(0) {}
 
 	bool operator==(const Node& n) const { return m_pos == n.m_pos; }
 };
@@ -72,6 +71,8 @@ public:
 
 	Node* getNodePtr(size_t index)  { return &m_nodes[index]; }
 
+	Nodes& nodes() { return m_nodes;  }
+
 	size_t worldSizeTiles() const { return m_world->getWidth() * m_world->getHeight(); }
 	size_t worldSizeNodes() const { return m_nodes.size(); }
 
@@ -91,8 +92,9 @@ public:
 	bool isGoalPoint(const PointD& p, const PointD& goal) const; // TODO - check!
 	PointD incrementNodeIndex(const PointD& point, Direction intcrementTo);
 
+	double getCostFromStart(const Node& node) const;
 	double getTransitionCost(const Node& from, const Node& neighbour) const;
-	double getHeuristicsTo(const Node& node, const PointD& goal) const;
+	double getHeuristicsTo(const Node& node, const Node& goal) const;
 
 
 	template <typename InitCallback>
@@ -101,17 +103,22 @@ public:
 		if (!isNodePassable(node))
 			return;
 
-		Direction directions[] = { Direction::UP, Direction::LEFT_UP, Direction::RIGHT_UP,
-		                           Direction::DOWN, Direction::LEFT_DOWN, Direction::RIGHT_DOWN,
-		                           Direction::LEFT, Direction::RIGHT };
+		static const Direction directions[] = 
+		{ 
+			Direction::UP, Direction::LEFT_UP, Direction::RIGHT_UP,
+		    Direction::DOWN, Direction::LEFT_DOWN, Direction::RIGHT_DOWN,
+		    Direction::LEFT, Direction::RIGHT 
+		};
+
+		double parentCostFromStart = getCostFromStart(node);
 
 		for (Direction d : directions)
 		{
 			PointD nextNodeIndex = incrementNodeIndex(node.m_pos, d);
-			Node& next = * getNodePtr(nextNodeIndex.x, nextNodeIndex.y);
+			Node* next = getNodePtr(nextNodeIndex.x, nextNodeIndex.y);
 
-			if (next.m_isPassable)
-				initNode(next);
+			if (next->m_isPassable)
+				initNode(next, parentCostFromStart);
 		}
 	}
 };
