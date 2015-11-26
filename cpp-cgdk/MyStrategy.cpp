@@ -19,22 +19,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	updateStates(self, world, game, move);
 	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move);
 
-	// it's good idea to shoot an enemy...
-	if (self.getProjectileCount() > 0)
-	{
-		auto carToShoot = std::find_if(world.getCars().cbegin(), world.getCars().cend(), [&self, &game](const Car& car)
-		{
-			const double scope = 1 * PI / 180;
-			return !car.isTeammate()
-				&& self.getDistanceTo(car) < game.getTrackTileSize() * 1.5
-				&& std::abs(self.getAngleTo(car)) < scope;
-		});
-
-		if (carToShoot != world.getCars().end())
-		{
-			move.setThrowProjectile(true);
-		}
-	}
+	shootEnemy(move);
 	
 	move.setEnginePower(1.0);
 
@@ -136,7 +121,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		&& degreesToWaypoint < 10.0 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize()
 		&& waypointTileType != TOP_HEADED_T
 		&& waypointTileType != RIGHT_HEADED_T
-	    	&& waypointTileType != LEFT_HEADED_T  
+	    && waypointTileType != LEFT_HEADED_T  
 		&& waypointTileType != BOTTOM_HEADED_T
 	   )
 	{
@@ -224,6 +209,25 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	printFinishStats();
 }
 
+void MyStrategy::shootEnemy(Move &move)
+{
+	// it's good idea to shoot an enemy...
+	if (m_self->getProjectileCount() > 0)
+	{
+		auto carToShoot = std::find_if(m_worlt.getCars().cbegin(), m_worlt.getCars().cend(), [this](const Car& car)
+		{
+			const double scope = 1 * PI / 180;
+			return !car.isTeammate()
+				&& m_self->getDistanceTo(car) < m_game->getTrackTileSize() * 1.5
+				&& std::abs(m_self->getAngleTo(car)) < scope;
+		});
+
+		if (carToShoot != m_world->getCars().end())
+		{
+			move.setThrowProjectile(true);
+		}
+	}
+}
 
 bool MyStrategy::IsOilDanger() const
 {

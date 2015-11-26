@@ -62,10 +62,6 @@ public:
 
 	void move(const model::Car& self, const model::World& world, const model::Game& game, model::Move& move);
 
-	bool IsOilDanger() const;
-
-	void simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake) const;
-
 private:
 	struct Statistics
 	{
@@ -101,6 +97,12 @@ private:
 	DebugVisualizer      m_debug;
 
 	void updateStates(const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move);
+
+	void shootEnemy(Move &move);
+	bool IsOilDanger() const;
+
+	void simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake) const;
+
 
 	bool isWallCollision();
 	bool isMovingForward()
