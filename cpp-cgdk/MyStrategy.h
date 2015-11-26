@@ -53,12 +53,18 @@ struct DebugMessage
 
 class MyStrategy : public Strategy 
 {
+	static const int CORNERING_SPEED_CAREFUL = 7;
+	static const int CORNERING_SPEED_REGULAR = 10;
+	static const int CORNERING_SPEED_OILED   = 5;
+
 public:
 	MyStrategy();
 
 	void move(const model::Car& self, const model::World& world, const model::Game& game, model::Move& move);
 
-	void simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake);
+	bool IsOilDanger() const;
+
+	void simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake) const;
 
 private:
 	struct Statistics

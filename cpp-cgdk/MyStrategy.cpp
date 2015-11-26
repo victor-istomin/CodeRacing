@@ -151,15 +151,17 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	bool isVeryCareful = self.getDurability() < 0.3 
 		|| waypointTileType == RIGHT_HEADED_T || waypointTileType == TOP_HEADED_T || waypointTileType == LEFT_HEADED_T || waypointTileType == BOTTOM_HEADED_T;
 
-	static const double SAFE_SPEED = isVeryCareful ? 7 : 10;
+	double corneringSpeed = isVeryCareful ? CORNERING_SPEED_CAREFUL : CORNERING_SPEED_REGULAR;
+	if (IsOilDanger())
+		corneringSpeed /= 2;
 
 	int ticksToBrake = 0;
 	double distanceToBrake = 0;
-	simulateBreaking(SAFE_SPEED, ticksToBrake, distanceToBrake);
+	simulateBreaking(corneringSpeed, ticksToBrake, distanceToBrake);
 	
 	// brake before waypoint
 	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / (isVeryCareful ? 4 : 5);
-	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > SAFE_SPEED && !isPassThruWaypoint)
+	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > corneringSpeed && !isPassThruWaypoint)
 	{
 		move.setBrake(true);
 		move.setUseNitro(false);
@@ -223,7 +225,35 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 }
 
 
-void MyStrategy::simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake)
+bool MyStrategy::IsOilDanger() const
+{
+	if (m_self->getRemainingOiledTicks() > 0)
+		return true; // already oiled
+
+	int    ticksToOiledSpeed = 0;
+	double distanceToOiledSpeed = 0;
+	simulateBreaking(CORNERING_SPEED_OILED, ticksToOiledSpeed, distanceToOiledSpeed);
+
+	return m_world->getOilSlicks().cend() != std::find_if(m_world->getOilSlicks().cbegin(), m_world->getOilSlicks().cend(),
+		[this, ticksToOiledSpeed, distanceToOiledSpeed](const OilSlick& slick)
+	{
+		double distanceToSlick = m_self->getDistanceTo(slick);
+
+		double xTicksToSlick = (slick.getX() - m_self->getX()) / m_self->getSpeedX();
+		double yTicksToSlick = (slick.getY() - m_self->getY()) / m_self->getSpeedY();
+		bool   canIntersect = xTicksToSlick >= 0 && yTicksToSlick > 0;
+
+		double safeDistance = m_game->getTrackTileSize();
+		double safeTime = ticksToOiledSpeed * 1.3;
+
+		bool isDangerous = canIntersect
+			&& (std::max(xTicksToSlick, yTicksToSlick) < safeTime || distanceToSlick < safeDistance);
+
+		return isDangerous;
+	});
+}
+
+void MyStrategy::simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake) const
 {
 	static const int    ITERATIONS_PER_STEP = 10;
 	static const double INCREMENT = 1.0 / ITERATIONS_PER_STEP;
