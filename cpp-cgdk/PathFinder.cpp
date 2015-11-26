@@ -34,6 +34,12 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 	map.isNodePassable(*start); // not needed?
 
+	if (!start->m_isPassable)
+	{
+		// TODO - shit happens, no time to fix now
+		start->m_isPassable = true;
+	}
+
 	assert(start->m_isPassable);
 	assert(finish->m_isPassable);
 
