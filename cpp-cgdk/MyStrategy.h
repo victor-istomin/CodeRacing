@@ -19,8 +19,8 @@ struct DebugVisualizer
 	void preRenderStart() { }
 	void preRenderFinish() { }
 
-	void renderWypoints(const Map& map, const model::Game& game, const model::World& world, const model::Car& self) {}
-	void renderMoveTarget(const model::Car& self, const model::Move& move, const Point& destination) {}
+	void renderWypoints(const Map&, const model::Game&, const model::World&, const model::Car&) {}
+	void renderMoveTarget(const model::Car&, const model::Move&, const Point&) {}
 };
 #endif
 
