@@ -14,10 +14,13 @@ struct PointD
 
 	explicit PointD(double px = 0, double py = 0) : x(px), y(py) {}
 
-	PointD operator*(double m)       const { return PointD(x * m, y * m); }
-	PointD operator/(double m)       const { return PointD(x / m, y / m); }
-	PointD operator+(const PointD& r) const { return PointD(x + r.x, y + r.y); }
-	PointD operator-(const PointD& r) const { return PointD(x - r.x, y - r.y); }
+	PointD  operator*(double m)       const  { return PointD(x * m, y * m); }
+	PointD  operator/(double m)       const  { return PointD(x / m, y / m); }
+	PointD  operator+(const PointD& r) const { return PointD(x + r.x, y + r.y); }
+	PointD  operator-(const PointD& r) const { return PointD(x - r.x, y - r.y); }
+
+	PointD& operator*=(double m)             { x *= m; y *= m; return *this; }
+	PointD& operator/=(double m)             { x /= m; y /= m; return *this; }
 
 	double distanceTo(const PointD& p) const { PointD diff = *this - p; return std::hypot(diff.x, diff.y); }
 

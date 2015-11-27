@@ -2,42 +2,44 @@
 #include <cassert>
 #include <cmath>
 
-Map::Map(const model::Game& game, const model::World& world) 
+Map::Map(const model::Game& game, const model::World& world)
 	: m_tiles(world.getTilesXY())
-	, m_nodes()
+	//, m_nodes()
 	, m_game(&game)
 	, m_world(&world)
 
 	, m_tileSize((int)m_game->getTrackTileSize())
 	, m_tileCenter((int)m_game->getTrackTileSize() / 2, (int)m_game->getTrackTileSize() / 2)
+	, m_worldWidthTiles(world.getWidth())
+	, m_worldHeightTiles(world.getHeight())
 
-	, m_worldWidthNodes((int)world.getWidth() * NODES_IN_TILE_AXIS)
-	, m_worldHeightNodes((int)world.getHeight() * NODES_IN_TILE_AXIS)
-	, m_worldPixelsInNode(m_tileSize / NODES_IN_TILE_AXIS)
-	, m_worldMartixSideNodes(std::max(m_worldWidthNodes, m_worldHeightNodes))
+	//, m_worldWidthNodes((int)world.getWidth() * NODES_IN_TILE_AXIS)
+	//, m_worldHeightNodes((int)world.getHeight() * NODES_IN_TILE_AXIS)
+	//, m_worldPixelsInNode(m_tileSize / NODES_IN_TILE_AXIS)
+	//, m_worldMartixSideNodes(std::max(m_worldWidthNodes, m_worldHeightNodes))
 {
-	m_nodes.resize(m_worldMartixSideNodes * m_worldMartixSideNodes);
+	//m_nodes.resize(m_worldMartixSideNodes * m_worldMartixSideNodes);
 
+	m_tileNodes.resize(m_worldWidthTiles * m_worldHeightTiles);
 	updateNodes();
 }
 
 void Map::updateNodes()
 {
-	for (size_t x = 0; x < m_worldWidthNodes; ++x)
+	for (int x = 0; x < m_worldWidthTiles; ++x)
 	{
-		for (size_t y = 0; y < m_worldHeightNodes; ++y)
+		for (int y = 0; y < m_worldHeightTiles; ++y)
 		{
-			Node& node = m_nodes[getNodeIndex(x, y)];
-			node.m_pos = PointD(x, y);
-			node.m_isPassable = isNodePassable(node);
-			node.m_cachedParent = nullptr;
-			node.m_cachedTransitionCost = 0;
+			TileNode& tileNode = m_tileNodes[getTileNodeIndex(x, y)];
+			tileNode.m_type = getTileType(x, y);
+			tileNode.m_pos = PointI(x, y);
+			tileNode.m_transition = TileNode::Transition();
 			// TODO - cars, etc...
 		}
 	}
 }
 
-bool Map::isNodePassable(const Node& node) const
+/*bool Map::isNodePassable(const Node& node) const
 {
 	if (node.m_pos.x < 0 || node.m_pos.y < 0 
 		|| node.m_pos.x >= m_worldWidthNodes
@@ -135,58 +137,149 @@ bool Map::isNodePassable(const Node& node) const
 	}
 
 	return isPassable;
-}
+}*/
 
-bool Map::isGoalPoint(const PointD& p, const PointD& goal) const
+/*bool Map::isGoalPoint(const PointD& p, const PointD& goal) const
 {
 	return p.distanceTo(goal) <= m_worldPixelsInNode;
 }
-
-PointD Map::incrementNodeIndex(const PointD& point, Direction intcrementTo)
+*/
+bool Map::incrementTileNodeIndex(const TileNode& initial, Direction incrementTo, PointI& result)
 {
-	assert(intcrementTo != Direction::UNKNOWN);
+	assert(incrementTo != Direction::UNKNOWN);
 
-	PointD incremented = point;
-	if (intcrementTo == Direction::DOWN || intcrementTo == Direction::LEFT_DOWN || intcrementTo == Direction::RIGHT_DOWN)
+	// TODO - validate turn
+	bool isValidDirection = true;
+	switch (initial.m_type)
+	{
+	case model::EMPTY:
+		assert(initial.m_type != model::EMPTY);  // no way here...
+		break;
+
+	case model::VERTICAL:
+		isValidDirection = incrementTo == Direction::UP || incrementTo == Direction::DOWN;
+		break;
+
+	case model::HORIZONTAL:
+		isValidDirection = incrementTo == Direction::LEFT || incrementTo == Direction::RIGHT;
+		break;
+
+	case model::LEFT_TOP_CORNER:
+		isValidDirection = incrementTo == Direction::DOWN || incrementTo == Direction::RIGHT;
+		break;
+
+	case model::RIGHT_TOP_CORNER:
+		isValidDirection = incrementTo == Direction::DOWN || incrementTo == Direction::LEFT;
+		break;
+
+	case model::LEFT_BOTTOM_CORNER:
+		isValidDirection = incrementTo == Direction::UP || incrementTo == Direction::RIGHT;
+		break;
+
+	case model::RIGHT_BOTTOM_CORNER:
+		isValidDirection = incrementTo == Direction::UP || incrementTo == Direction::LEFT;
+		break;
+
+	case model::LEFT_HEADED_T:
+		isValidDirection = incrementTo != Direction::RIGHT;
+		break;
+
+	case model::RIGHT_HEADED_T:
+		isValidDirection = incrementTo != Direction::LEFT;
+		break;
+
+	case model::TOP_HEADED_T:
+		isValidDirection = incrementTo != Direction::DOWN;
+		break;
+
+	case model::BOTTOM_HEADED_T:
+		isValidDirection = incrementTo != Direction::UP;
+		break;
+
+	case model::CROSSROADS:
+		isValidDirection = true; // any OK
+		break;
+
+	case model::UNKNOWN:
+	case model::_TILE_TYPE_COUNT_:
+	default:
+		isValidDirection = true;
+		assert(0 && "no idea yet");
+		break;
+	}
+
+	const PointI& point = initial.m_pos;
+
+	auto incremented = point;
+	if (incrementTo == Direction::DOWN)
 		incremented.y++;
 
-	if (intcrementTo == Direction::UP || intcrementTo == Direction::LEFT_UP || intcrementTo == Direction::RIGHT_UP)
+	if (incrementTo == Direction::UP)
 		incremented.y--;
 
-	if (intcrementTo == Direction::LEFT || intcrementTo == Direction::LEFT_DOWN || intcrementTo == Direction::LEFT_UP)
+	if (incrementTo == Direction::LEFT)
 		incremented.x--;
 
-	if (intcrementTo == Direction::RIGHT || intcrementTo == Direction::RIGHT_DOWN || intcrementTo == Direction::RIGHT_UP)
+	if (incrementTo == Direction::RIGHT)
 		incremented.x++;
 
-	return incremented;
+	result = incremented;
+	return isValidDirection 
+		&& incremented.x >= 0 && incremented.x < m_worldWidthTiles && incremented.y >= 0 && incremented.y < m_worldHeightTiles;
 }
 
-double Map::getCostFromStart(const Node& node) const
+double Map::getCostFromStart(const TileNode& node) const
 {
-	double cost = 0;
-	const Node* current = &node;
-	const Node* parent = current->m_cachedParent;
+	unsigned cost = 0;
+	const TileNode* parent = node.m_transition.m_cachedParent;
 
 	while (parent != nullptr)
 	{
-		cost += current->m_cachedTransitionCost;
-		current = parent;
-		parent = current->m_cachedParent;
+		cost += parent->m_transition.getCost();
+		parent = parent->m_transition.m_cachedParent;
 	}
 
 	return cost;
 }
 
-double Map::getTransitionCost(const Node& from, const Node& neighbour) const
+/*double Map::getTransitionCost(const Node& from, const Node& neighbour) const
 {
 	PointD diff = from.m_pos - neighbour.m_pos;
 	return std::hypot(diff.x, diff.y); // TODO - cars, obstacles, angle, etc.
-}
+}*/
 
-double Map::getHeuristicsTo(const Node& node, const Node& goal) const
+double Map::getHeuristicsTo(const TileNode& node, const TileNode& goal) const
 {
-	PointD diff = node.m_pos - goal.m_pos;
+	PointI diff = node.m_pos - goal.m_pos;
 	return std::hypot(diff.x, diff.y); // TODO - cars, obstacles, angle, etc.
 }
 
+TileNode::Transition::Transition(TileNode& from, TileNode& to)
+	: m_cachedParent(&from)
+	, m_turnedDirection(UNKNOWN)
+{
+	if (from.m_pos.x > to.m_pos.x)
+		m_turnedDirection = LEFT;
+	if (from.m_pos.x < to.m_pos.x)
+		m_turnedDirection = RIGHT;
+	if (from.m_pos.y > to.m_pos.y)
+		m_turnedDirection = UP;
+	if (from.m_pos.y < to.m_pos.y)
+		m_turnedDirection = DOWN;
+
+	assert(m_turnedDirection != UNKNOWN);
+}
+
+unsigned TileNode::Transition::getCost() const
+{
+	static const unsigned NORMAL_COST  = 1;
+	static const unsigned TURN_PENALTY = 1;
+
+	unsigned cost = NORMAL_COST;
+
+	TurnDirection previousTurn = m_cachedParent == nullptr ? m_turnedDirection/*assume no change*/ : m_cachedParent->m_transition.m_turnedDirection;
+	if (m_turnedDirection != previousTurn)
+		cost += TURN_PENALTY;
+
+	return cost;		
+}

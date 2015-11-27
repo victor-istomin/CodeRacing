@@ -5,6 +5,7 @@
 
 #include <string>
 #include <cstdint>
+#include <memory>
 
 #include "model/World.h"
 #include "model/Car.h"
@@ -52,21 +53,31 @@ public:
 		m_render.fillCircle(destination.x, destination.y, std::hypot(self.getWidth(), self.getHeight()) / 2, color);
 	}
 
-	void renderPath(PathFinder& pathFinder, const model::Car& self, const PointD& destinateion)
+	void renderPath(Map& map, PathFinder& pathFinder, const model::Car& self, const PointD& destinateion)
 	{
-		PointD start = PointD(PointD(self.getX(), self.getY()));
+		PointD start = PointD(self.getX(), self.getY());
 
 		PathFinder::Path path = pathFinder.getPath(start, PointD(destinateion));
-		const PointD* previous = nullptr;
-		for (const PointD& step : path)
+		std::unique_ptr<PointD> previous;
+
+		for (const PathFinder::TilePathNode& step : path)
 		{
+			PointD stepPoint = map.getTileCenter(step.m_pos.x, step.m_pos.y);
 			if (previous != nullptr)
 			{
-				m_render.line(previous->x, previous->y, step.x, step.y, 0x008800);
+				m_render.line(previous->x, previous->y, stepPoint.x, stepPoint.y, 0x008800);
 			}
 
-			m_render.circle(step.x, step.y, 50, 0x008800);
-			previous = &step;
+			const char* sign = step.m_turnRelative == PathFinder::TilePathNode::TURN_NONE ? "="
+				: (step.m_turnRelative == PathFinder::TilePathNode::TURN_COUNTER_CLOCKWISE ? "-" : "+");
+
+			m_render.circle(stepPoint.x + 30, stepPoint.y, 80 - 30, 0x008800);
+			m_render.text(stepPoint.x, stepPoint.y, sign);
+
+			if (previous == nullptr)
+				previous.reset(new PointD());
+
+			*previous = stepPoint;
 		}
 
 	}

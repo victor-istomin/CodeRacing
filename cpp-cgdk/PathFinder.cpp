@@ -13,8 +13,8 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 {
 	Map& map = m_map;
 
-	typedef std::multimap<double/*cost*/, Node*> CostNodeMap;
-	typedef std::unordered_set<Node*> HashedNodes;   // nodes array is fixed size. It's ok to work woth pointers here
+	typedef std::multimap<double/*cost*/, TileNode*> CostNodeMap;
+	typedef std::unordered_set<TileNode*> HashedNodes;   // nodes array is fixed size. It's ok to work with pointers here
 
 	HashedNodes closedSet;
 
@@ -27,32 +27,19 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 	PointD dbgPoint2 = map.nodeToPoint(*dbgNode3);
 	***/
 
-	Node* start = map.getNodePtr(from);
-	Node* finish = map.getNodePtr(to);
-	start->m_hx = map.getHeuristicsTo(*start, *finish);
-	finish->m_hx = 0;
-
-	map.isNodePassable(*start); // not needed?
-
-	if (!start->m_isPassable)
-	{
-		// TODO - shit happens, no time to fix now
-		start->m_isPassable = true;
-	}
-
-	assert(start->m_isPassable);
-	assert(finish->m_isPassable);
+	TileNode* start  = map.getTileNodePtr(map.getTileNodeIndex(from));
+	TileNode* finish = map.getTileNodePtr(map.getTileNodeIndex(to));
 
 	CostNodeMap openSet;
 	HashedNodes openSetHash;
-	openSet.insert( std::make_pair(start->m_hx, start) );
+	openSet.insert(std::make_pair(map.getHeuristicsTo(*start, *finish), start));
 	openSetHash.insert(start);
 
 	Path path;
 	
 	while (!openSet.empty())
 	{
-		Node* currentNode = openSet.begin()->second;
+		TileNode* currentNode = openSet.begin()->second;
 
 		closedSet.insert(currentNode);
 		openSet.erase(openSet.begin());
@@ -60,17 +47,13 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 		// reconstruct path if at goal position
 
-		PointD currentNodePoint = map.nodeToPoint(*currentNode);
-		if (map.isGoalPoint(currentNodePoint, to))
+		if (currentNode == finish)
 		{
-			Node* previousNode = currentNode;
+			TileNode* previousNode = currentNode;
 			while (previousNode != nullptr)
 			{
-				/*** dbg ***/
-				double gx = map.getCostFromStart(*previousNode);
-				/*** dbg ***/
-				path.push_front(map.nodeToPoint(*previousNode));
-				previousNode = previousNode->m_cachedParent;
+				path.emplace_front(*previousNode);
+				previousNode = previousNode->m_transition.m_cachedParent;
 			}
 
 			return path;
@@ -79,27 +62,33 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 		// add neighbors to open list
 
 		map.fillNeighbors(*currentNode, 
-			[&map, &currentNode, &finish, &openSet, &openSetHash, &closedSet](Node* candidate, double currentGx)
+			[&map, &currentNode, &finish, &openSet, &openSetHash, &closedSet](TileNode* candidate, double currentGx)
 		{
-			if (candidate == currentNode || candidate == currentNode->m_cachedParent)
+			if (candidate == currentNode || candidate == currentNode->m_transition.m_cachedParent)
 				return;
 
-			double newTransitionCost = map.getTransitionCost(*currentNode, *candidate);
+			assert(candidate->m_type != model::EMPTY);
+
+			TileNode::Transition newTransition = TileNode::Transition(*currentNode, *candidate);
+
+			double newTransitionCost = newTransition.getCost();
 			double newGx = currentGx + newTransitionCost;
-			double newHx = map.getHeuristicsTo(*candidate, *finish); // TODO (!) - clarify Node/Point conversion!
-			double newFx = newGx + newHx;
+			double heuristics = map.getHeuristicsTo(*candidate, *finish); // TODO - can change or can not? This matters in closed node improvement
+			double newFx = newGx + heuristics;
 
 			bool isAlreadyOpened = openSetHash.find(candidate) != openSetHash.end();
 			bool isAlreadyClosed = closedSet.find(candidate)   != closedSet.end();
 			bool isAlreadySeen = isAlreadyOpened || isAlreadyClosed;
 			double candidateOldGx = map.getCostFromStart(*candidate);
+
 			if (isAlreadySeen && candidateOldGx <= newGx)
 			{
 				return;
 			}
-			else if (isAlreadyClosed)
+			else if (isAlreadySeen)
 			{
-				double costKey = candidateOldGx + candidate->m_hx;
+				// purge old worst result
+				double costKey = candidateOldGx + heuristics;
 				CostNodeMap::iterator found = openSet.lower_bound(costKey);
 				while (found != openSet.end() && found->first == costKey)  // TODO: epsilon?
 				{
@@ -118,10 +107,7 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 			// update stats only if new path through close node is shorter
 
-			candidate->m_hx                   = newHx;
-			candidate->m_cachedTransitionCost = newTransitionCost;
-			candidate->m_cachedParent         = currentNode;			
-
+			candidate->m_transition = newTransition;
 			openSet.insert( std::make_pair(newFx, candidate) );
 			openSetHash.insert(candidate);
 			return;
@@ -131,3 +117,10 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 	return path;
 }
 
+PathFinder::TilePathNode::TilePathNode(const TileNode& node)
+	: m_pos(node.m_pos)
+	, m_turnAbsolute(node.m_transition.m_turnedDirection)
+	, m_turnRelative(TURN_NONE)
+{
+	// TODO - actualy, relative turn does not works
+}
