@@ -12,8 +12,10 @@ const double PointD::k_epsilon = 0.001;
 #include <cstdlib>
 #include <algorithm>
 #include <numeric>
-#include <iostream>
 #include <set>
+#include <type_traits>
+#include <cassert>
+#include <iostream>
 
 using namespace model;
 const double MyStrategy::k_angleFactor = 32.0 / PI;
@@ -21,7 +23,9 @@ const double MyStrategy::k_angleFactor = 32.0 / PI;
 void MyStrategy::move(const Car& self, const World& world, const Game& game, Move& move)
 {
 	updateStates(self, world, game, move);
-	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move, *m_pathFinder);
+	PathFinder::Path turnsAhead = getTurnsToWaypoint();
+
+	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move, turnsAhead);
 
 	// it's good idea to shoot an enemy...
 	if (self.getProjectileCount() > 0)
@@ -43,19 +47,21 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setEnginePower(1.0);
 
 	// get next waypoint
-	PointD tmp = m_map->getTileCenter(self.getNextWaypointX(), self.getNextWaypointY());
-	PointD nextWaypoint = PointD(tmp.x, tmp.y);
+	PathFinder::Path waypointPath = getTurnsToWaypoint();
+	PointI waypointIndex = waypointPath.empty() ? PointI((self.getNextWaypointX(), self.getNextWaypointY())) : waypointPath.front().m_pos;
+	PointD nextWaypoint = getTurnEntryPoint(waypointIndex.x, waypointIndex.y);
 
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
-	bool isPassThruWaypoint = false; // TODO - fixme
+	bool isPassThruWaypoint = waypointPath.empty() ? false : waypointPath.front().m_turnRelative == RelativeTurn::TURN_NONE; // TODO - fixme
 
 	/* optimize cornering */
 	const double FAR = game.getTrackTileSize() * 1.3;
 	double cornerTileOffset = 0.25 * game.getTrackTileSize();
-	int offsetDirection = distanceToWaypoint > FAR ? -1 : 1;
+	
 
 	TileType waypointTileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
+	/*
 	switch (waypointTileType)
 	{
 	case LEFT_TOP_CORNER:
@@ -82,10 +88,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		break;
 
 	case TOP_HEADED_T:
-	{
+	if (0){
 		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
-		tmp = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
-		nextWaypoint = PointD(tmp.x, tmp.y);
+		nextWaypoint = m_map->getTileCorner(waypointIndex.x, waypointIndex.y);
 		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
 		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
@@ -100,10 +105,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	}
 
 	case RIGHT_HEADED_T:
-	{
+	if (0) {
 		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
-		tmp = m_map->getTileCorner(self.getNextWaypointX(), self.getNextWaypointY());
-		nextWaypoint = PointD(tmp.x, tmp.y);
+		nextWaypoint = m_map->getTileCorner(waypointIndex.x, waypointIndex.y);
 		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
 		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
@@ -120,6 +124,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	default:
 		break;
 	}
+	*/
 
 	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
 	distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
@@ -153,6 +158,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	{
 		move.setUseNitro(true);
 	}
+
 	
 	// move
 	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;
@@ -367,6 +373,141 @@ void MyStrategy::printFinishStats() const
 #endif
 }
 
+PathFinder::Path MyStrategy::getTurnsToWaypoint()
+{
+	const auto& waypoints = m_world->getWaypoints();
+	int waypointIndex = m_self->getNextWaypointIndex();
+	int furtherWaypointIndex = (waypointIndex + 1) % waypoints.size();
+
+	PointD current = PointD(m_self->getX(), m_self->getY());
+	PointD waypoint = m_map->getTileCenter(waypoints[waypointIndex][0], waypoints[waypointIndex][1]);
+	PointD furtherWaypoint = m_map->getTileCenter(waypoints[furtherWaypointIndex][0], waypoints[furtherWaypointIndex][1]);
+
+	double selfAngle = m_self->getAngle();
+	if (selfAngle < 0)
+		selfAngle += 2 * PI;
+
+	struct AngleConstraints
+	{
+		TileNode::Transition::TurnDirection direction;
+		double angle;
+
+		bool operator==(TileNode::Transition::TurnDirection dir) const { return this->direction == dir; }
+	};
+
+	static const AngleConstraints directionsByAngle[] =
+	{ 
+		{TileNode::Transition::RIGHT, 0},
+		{TileNode::Transition::DOWN,  PI/2},
+		{TileNode::Transition::LEFT,  PI},
+		{TileNode::Transition::UP,    3 * PI / 2}
+	};
+
+	static const size_t DIRECTIONS_COUNT = std::extent<decltype(directionsByAngle)>::value;
+
+	AngleConstraints relativeAngles[DIRECTIONS_COUNT];
+	std::transform(std::begin(directionsByAngle), std::end(directionsByAngle), std::begin(relativeAngles), [selfAngle](AngleConstraints constraints) 
+	{
+		constraints.angle = std::abs(selfAngle - constraints.angle);
+		return constraints;
+	});
+	
+	std::sort(std::begin(relativeAngles), std::end(relativeAngles), [](const AngleConstraints& a, const AngleConstraints& b) { return a.angle < b.angle; });
+	
+	auto currentDirection = relativeAngles[0].direction; // closest angle constraint
+	size_t directionQuarter = std::find(std::begin(directionsByAngle), std::end(directionsByAngle), currentDirection) - std::begin(directionsByAngle);
+
+	// calculate turns
+	PathFinder::Path path        = m_pathFinder->getPath(current, waypoint);
+	PathFinder::Path furtherPath = m_pathFinder->getPath(waypoint, furtherWaypoint);
+	if (!furtherPath.empty())
+		furtherPath.pop_front(); // don't duplicate 1st waypoint tile
+	std::copy(std::begin(furtherPath), std::end(furtherPath), std::back_inserter(path));
+
+	assert(!path.empty());
+	if (path.empty())
+		return path;
+
+	// convert 'went from' directions to 'turn to' directions
+	for (auto it = path.begin(); it != path.end(); ++it)
+	{
+		auto nextIt = it; ++nextIt;
+		auto turnTo = nextIt == path.end() ? TileNode::Transition::UNKNOWN/*no information*/ : nextIt->m_turnAbsolute;
+
+		it->m_turnAbsolute = turnTo;
+	}
+	
+	PathFinder::Path turns;
+	PathFinder::TilePathNode previous = path.front();
+	currentDirection = previous.m_turnAbsolute;
+
+	for (const PathFinder::TilePathNode& nextTile : path)
+	{
+		if (nextTile.m_pos == previous.m_pos)
+			continue;  // skip first tile
+
+		// experimental feature - ignore waypoint if no turn
+		if (/*nextTile.m_isWaypoint || */nextTile.m_turnAbsolute != currentDirection /*turn*/)
+		{
+			turns.emplace_back(nextTile);
+
+			auto clockwise    = directionsByAngle[(directionQuarter + 1) % DIRECTIONS_COUNT].direction;
+			auto turnRelative = (nextTile.m_turnAbsolute == clockwise) ? RelativeTurn::TURN_CLOCKWISE : RelativeTurn::TURN_COUNTER_CLOCKWISE;
+
+			// if waypoint and no turn
+			if (nextTile.m_isWaypoint && nextTile.m_turnAbsolute == currentDirection)
+				turnRelative = RelativeTurn::TURN_NONE;
+
+			turns.back().m_turnRelative = turnRelative;
+
+			currentDirection = nextTile.m_turnAbsolute;
+			directionQuarter = std::find(std::begin(directionsByAngle), std::end(directionsByAngle), currentDirection) - std::begin(directionsByAngle);
+		}
+
+		previous = nextTile;
+	}
+
+	return turns;
+}
+
+PointD MyStrategy::getTurnEntryPoint(int x, int y) const
+{
+	static const double FAR_DISTANCE = m_game->getTrackTileSize() * 1.7;
+
+	PointD turnCenter      = m_map->getTileCenter(x, y);
+	PointI selfTileIndex   = m_map->getTileIndex(PointD(m_self->getX(), m_self->getY()));
+	bool isHorizontalEnrty = selfTileIndex.y == y;
+	bool isVerticalEntry   = selfTileIndex.x == x;
+	bool isFarFrom = m_self->getDistanceTo(turnCenter.x, turnCenter.y) > FAR_DISTANCE;
+
+	if (!isVerticalEntry && !isHorizontalEnrty)
+	{
+		assert(isVerticalEntry || isHorizontalEnrty); // something went wrong
+		return turnCenter;
+	}
+
+	PointD entry = m_map->getTurnOuterCorner(x, y);
+	double towardsDisplacement = isFarFrom ? m_game->getTrackTileSize() * 1.3 : m_game->getTrackTileSize() / 2;
+
+	if (isHorizontalEnrty)
+	{
+		double centerDisplacement  = 1.8 * (turnCenter.y - entry.y);  // TODO - avoid magic
+
+		entry.x += (selfTileIndex.x > x ? 1 : -1) * towardsDisplacement;
+		entry.y += isFarFrom ? 0 : centerDisplacement;
+	}
+
+	if (isVerticalEntry)
+	{
+		double centerDisplacement = 1.8  * (turnCenter.x - entry.x);  // TODO - avoid magic
+
+		entry.y += (selfTileIndex.y > y ? 1 : -1) * towardsDisplacement;
+		entry.x += isFarFrom ? 0 : centerDisplacement;
+	}
+
+	return entry;
+}
+
 MyStrategy::Statistics::Statistics()
 	: m_maxSpeed(0), m_currentSpeed(0), m_previousSpeed(0), m_lastWallCollisionTick(0), m_lastCollisionEscapeTick(0), m_lastOilTick(0), m_sumSpeed(0)
 	, m_isEscapingCollision(false) 
@@ -376,8 +517,9 @@ MyStrategy::Statistics::Statistics()
 
 void MyStrategy::Statistics::output(int ticks) const
 {
-#define STAT(name)                << "  " #name << ": " << name << "; " << std::endl
-#define STAT_COMPUTE(name, value) << "  " name  << ": " << (value) << "; " << std::endl
+#ifdef _DEBUG
+#  define STAT(name)                << "  " #name << ": " << name << "; " << std::endl
+#  define STAT_COMPUTE(name, value) << "  " name  << ": " << (value) << "; " << std::endl
 
 	std::cout << "Stats: " << std::endl
 		STAT(m_maxSpeed)
@@ -387,4 +529,5 @@ void MyStrategy::Statistics::output(int ticks) const
 		STAT(m_isEscapingCollision)
 		STAT(m_lastOilTick)
 		STAT_COMPUTE("avg speed", m_sumSpeed / (double)ticks);
+#endif
 }

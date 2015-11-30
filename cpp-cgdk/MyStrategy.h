@@ -3,16 +3,17 @@
 #ifndef _MY_STRATEGY_H_
 #define _MY_STRATEGY_H_
 
-#include "Strategy.h"
-#include "Utils.h"
 #include <cmath>
 #include <cstdint>
 #include <numeric>
 #include <type_traits>
 #include <memory>
 
+#include "Strategy.h"
+#include "Utils.h"
+#include "PathFinder.h"
+
 class Map;
-class PathFinder;
 
 #ifdef _DEBUG
 # include "DebugVisualizer.h"
@@ -23,7 +24,8 @@ struct DebugVisualizer
 	void preRenderFinish() { }
 
 	void renderWypoints(const Map&, const model::Game&, const model::World&, const model::Car&) {}
-	void renderMoveTarget(Map&, const model::Car&, const model::Move&, const PointD&) {}
+	void renderMoveTarget(const model::Car&, const model::Move&, const PointD&) {}
+	void renderPath(Map&, const PathFinder::Path&) {}
 };
 #endif
 
@@ -36,14 +38,15 @@ struct DebugMessage
 	const model::World& m_world;
 	const model::Game&  m_game;
 	const model::Move&  m_move;
-	PathFinder&         m_pf;    // todo - const?
+	const PathFinder::Path& m_turnsToWaypoint;
+
 
 	PointD m_destination;
 
 	DebugMessage(DebugVisualizer& v, Map& map
 		, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move
-		, PathFinder& pf)
-			: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move), m_pf(pf)
+		, const PathFinder::Path& turnsToWaypoint)
+			: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move), m_turnsToWaypoint(turnsToWaypoint)
 	{
 	}
 
@@ -53,7 +56,7 @@ struct DebugMessage
 		m_v.preRenderStart();
 		m_v.renderWypoints(m_map, m_game, m_world, m_self);
 		m_v.renderMoveTarget(m_self, m_move, m_destination);
-		m_v.renderPath(m_map, m_pf, m_self, m_destination);
+		m_v.renderPath(m_map, m_turnsToWaypoint);
 
 		m_v.preRenderFinish();
 	}
@@ -118,6 +121,9 @@ private:
 	}
 
 	void printFinishStats() const;
+
+	PathFinder::Path getTurnsToWaypoint();
+	PointD getTurnEntryPoint(int x, int y) const;
 };
 
 #endif

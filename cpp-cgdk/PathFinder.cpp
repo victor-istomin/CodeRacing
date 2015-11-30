@@ -7,25 +7,16 @@
 #include <cassert>
 #include <cmath>
 #include <vector>
-#include <iostream>
 
 PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 {
 	Map& map = m_map;
+	map.resetPathFinderCaches();
 
 	typedef std::multimap<double/*cost*/, TileNode*> CostNodeMap;
 	typedef std::unordered_set<TileNode*> HashedNodes;   // nodes array is fixed size. It's ok to work with pointers here
 
 	HashedNodes closedSet;
-
-	/*** test node-point conversion 
-	size_t dbgIndex = map.getNodeIndex(10, 10);
-	Node* dbgNode = map.getNodePtr(dbgIndex);
-	Node* dbgNode2 = map.getNodePtr(10, 10);
-	PointD dbgPoint = map.nodeToPoint(*dbgNode);
-	Node* dbgNode3 = map.getNodePtr(dbgPoint);
-	PointD dbgPoint2 = map.nodeToPoint(*dbgNode3);
-	***/
 
 	TileNode* start  = map.getTileNodePtr(map.getTileNodeIndex(from));
 	TileNode* finish = map.getTileNodePtr(map.getTileNodeIndex(to));
@@ -71,7 +62,7 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 			TileNode::Transition newTransition = TileNode::Transition(*currentNode, *candidate);
 
-			double newTransitionCost = newTransition.getCost();
+			double newTransitionCost = newTransition.getCost(*candidate);
 			double newGx = currentGx + newTransitionCost;
 			double heuristics = map.getHeuristicsTo(*candidate, *finish); // TODO - can change or can not? This matters in closed node improvement
 			double newFx = newGx + heuristics;
@@ -120,7 +111,8 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 PathFinder::TilePathNode::TilePathNode(const TileNode& node)
 	: m_pos(node.m_pos)
 	, m_turnAbsolute(node.m_transition.m_turnedDirection)
-	, m_turnRelative(TURN_NONE)
+	, m_turnRelative(RelativeTurn::TURN_NONE)
+	, m_isWaypoint(node.m_isWaypoint)
 {
 	// TODO - actualy, relative turn does not works
 }

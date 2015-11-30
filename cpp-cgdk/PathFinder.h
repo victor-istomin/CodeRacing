@@ -11,12 +11,12 @@ class PathFinder
 public:
 	struct TilePathNode
 	{
-		typedef TileNode::Transition::TurnDirection TurnAbsolute;
-		enum TurnRelative { TURN_NONE = 0, TURN_CLOCKWISE, TURN_COUNTER_CLOCKWISE, };
+		typedef TileNode::Transition::TurnDirection AbsoluteTurn;
 		
 		PointI       m_pos;
-		TileNode::Transition::TurnDirection m_turnAbsolute;
-		TurnRelative m_turnRelative;
+		AbsoluteTurn m_turnAbsolute;
+		RelativeTurn m_turnRelative;
+		bool         m_isWaypoint;
 
 		explicit TilePathNode(const TileNode& node);
 	};

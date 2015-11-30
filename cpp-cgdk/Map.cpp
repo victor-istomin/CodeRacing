@@ -1,10 +1,10 @@
 #include "Map.h"
 #include <cassert>
 #include <cmath>
+#include <map>
 
 Map::Map(const model::Game& game, const model::World& world)
 	: m_tiles(world.getTilesXY())
-	//, m_nodes()
 	, m_game(&game)
 	, m_world(&world)
 
@@ -12,13 +12,7 @@ Map::Map(const model::Game& game, const model::World& world)
 	, m_tileCenter((int)m_game->getTrackTileSize() / 2, (int)m_game->getTrackTileSize() / 2)
 	, m_worldWidthTiles(world.getWidth())
 	, m_worldHeightTiles(world.getHeight())
-
-	//, m_worldWidthNodes((int)world.getWidth() * NODES_IN_TILE_AXIS)
-	//, m_worldHeightNodes((int)world.getHeight() * NODES_IN_TILE_AXIS)
-	//, m_worldPixelsInNode(m_tileSize / NODES_IN_TILE_AXIS)
-	//, m_worldMartixSideNodes(std::max(m_worldWidthNodes, m_worldHeightNodes))
 {
-	//m_nodes.resize(m_worldMartixSideNodes * m_worldMartixSideNodes);
 
 	m_tileNodes.resize(m_worldWidthTiles * m_worldHeightTiles);
 	updateNodes();
@@ -34,116 +28,37 @@ void Map::updateNodes()
 			tileNode.m_type = getTileType(x, y);
 			tileNode.m_pos = PointI(x, y);
 			tileNode.m_transition = TileNode::Transition();
+			tileNode.m_isWaypoint = false;
 			// TODO - cars, etc...
 		}
 	}
-}
 
-/*bool Map::isNodePassable(const Node& node) const
-{
-	if (node.m_pos.x < 0 || node.m_pos.y < 0 
-		|| node.m_pos.x >= m_worldWidthNodes
-		|| node.m_pos.y >= m_worldHeightNodes)
-			return false;
-
-	PointD           tileXY   = nodeToTileXY(node);
-	model::TileType  tileType = getTileType(tileXY.x, tileXY.y);
-	PointD           positionInTile = nodeToPoint(node) - getTileCorner(tileXY.x, tileXY.y);
-
-	assert(positionInTile.x <= m_tileSize && positionInTile.y <= m_tileSize);
-
-	bool isPassable = true;
-	const int carMargin        = std::min(m_game->getCarWidth(), m_game->getCarHeight()) / 2;
-	const int stoneMargin      = carMargin + m_game->getTrackTileMargin();
-
-	const int tileLeftMargin   = m_game->getTrackTileMargin() + carMargin;
-	const int tileRightMargin  = m_tileSize - m_game->getTrackTileMargin() - carMargin;
-	const int tileTopMargin    = m_game->getTrackTileMargin() + carMargin;
-	const int tileBottomMargin = m_tileSize - m_game->getTrackTileMargin() - carMargin;
-
-	const PointD rightBottomStone = PointD(m_tileSize, m_tileSize);
-	const PointD leftBottomStone  = PointD(0, m_tileSize);
-	const PointD rightTopStone    = PointD(m_tileSize, 0);
-	const PointD leftTopStone     = PointD(0, 0);
-
-	switch (tileType)
+	for (const auto& waypoint : m_world->getWaypoints())
 	{
-	case model::EMPTY:
-		isPassable = false;
-		break;
-
-	case model::VERTICAL:
-		isPassable = positionInTile.x >= tileLeftMargin && positionInTile.x <= tileRightMargin;
-		break;
-
-	case model::HORIZONTAL:
-		isPassable = positionInTile.y >= tileTopMargin && positionInTile.y <= tileBottomMargin;
-		break;
-
-	case model::LEFT_TOP_CORNER:
-		isPassable = positionInTile.x >= tileLeftMargin && positionInTile.y >= tileTopMargin
-			&& positionInTile.distanceTo(rightBottomStone) >= stoneMargin;
-		break;
-
-	case model::RIGHT_TOP_CORNER:
-		isPassable = positionInTile.x <= tileRightMargin && positionInTile.y >= tileTopMargin
-			&& positionInTile.distanceTo(leftBottomStone) >= stoneMargin;
-		break;
-
-	case model::LEFT_BOTTOM_CORNER:
-		isPassable = positionInTile.x >= tileLeftMargin && positionInTile.y <= tileBottomMargin
-			&& positionInTile.distanceTo(rightTopStone) >= stoneMargin;
-		break;
-
-	case model::RIGHT_BOTTOM_CORNER:
-		isPassable = positionInTile.x <= tileRightMargin && positionInTile.y <= tileBottomMargin
-			&& positionInTile.distanceTo(leftTopStone) >= stoneMargin;
-		break;
-
-	case model::LEFT_HEADED_T:
-		isPassable = positionInTile.x <= tileRightMargin
-			&& positionInTile.distanceTo(leftTopStone) >= stoneMargin
-			&& positionInTile.distanceTo(leftBottomStone) >= stoneMargin;
-		break;
-
-	case model::RIGHT_HEADED_T:
-		isPassable = positionInTile.x >= tileLeftMargin
-			&& positionInTile.distanceTo(rightTopStone) >= stoneMargin
-			&& positionInTile.distanceTo(rightBottomStone) >= stoneMargin;
-		break;
-
-	case model::TOP_HEADED_T:
-		isPassable = positionInTile.y <= tileBottomMargin
-			&& positionInTile.distanceTo(leftTopStone) >= stoneMargin
-			&& positionInTile.distanceTo(rightTopStone) >= stoneMargin;
-		break;
-
-	case model::BOTTOM_HEADED_T:
-		isPassable = positionInTile.y >= tileTopMargin
-			&& positionInTile.distanceTo(leftBottomStone) >= stoneMargin
-			&& positionInTile.distanceTo(rightBottomStone) >= stoneMargin;
-		break;
-
-	case model::CROSSROADS:
-		isPassable = positionInTile.distanceTo(leftTopStone) >= stoneMargin
-                  && positionInTile.distanceTo(rightTopStone) >= stoneMargin
-		          && positionInTile.distanceTo(leftBottomStone) >= stoneMargin
-		          && positionInTile.distanceTo(rightBottomStone) >= stoneMargin;
-		break;
-
-	case model::UNKNOWN: // TODO
-	default:
-		break;
+		TileNode& tileNode = m_tileNodes[getTileNodeIndex(waypoint[0], waypoint[1])];
+		tileNode.m_isWaypoint = true;
 	}
-
-	return isPassable;
-}*/
-
-/*bool Map::isGoalPoint(const PointD& p, const PointD& goal) const
-{
-	return p.distanceTo(goal) <= m_worldPixelsInNode;
 }
-*/
+
+PointD Map::getTurnOuterCorner(int x, int y) const
+{
+	static const double displacement = m_game->getTrackTileMargin() + std::min(m_game->getCarWidth(), m_game->getCarHeight()) / 2;
+	static const double bigDisplacement = m_game->getTrackTileSize() - displacement;
+
+	static const std::map<model::TileType, PointD> displacementMap = 
+	{
+		{ model::LEFT_TOP_CORNER,     PointD(displacement,    displacement) },
+		{ model::LEFT_BOTTOM_CORNER,  PointD(displacement,    bigDisplacement) },
+		{ model::RIGHT_TOP_CORNER,    PointD(bigDisplacement, displacement) },
+		{ model::RIGHT_BOTTOM_CORNER, PointD(bigDisplacement, bigDisplacement) },
+
+		// others not yet implemented
+	};
+
+	auto displacementIt = displacementMap.find(getTileType(x, y));
+	return getTileCorner(x, y) + (displacementIt != displacementMap.end() ? displacementIt->second : m_tileCenter);
+}
+
 bool Map::incrementTileNodeIndex(const TileNode& initial, Direction incrementTo, PointI& result)
 {
 	assert(incrementTo != Direction::UNKNOWN);
@@ -235,23 +150,25 @@ double Map::getCostFromStart(const TileNode& node) const
 
 	while (parent != nullptr)
 	{
-		cost += parent->m_transition.getCost();
+		cost += parent->m_transition.getCost(node);
 		parent = parent->m_transition.m_cachedParent;
 	}
 
 	return cost;
 }
 
-/*double Map::getTransitionCost(const Node& from, const Node& neighbour) const
-{
-	PointD diff = from.m_pos - neighbour.m_pos;
-	return std::hypot(diff.x, diff.y); // TODO - cars, obstacles, angle, etc.
-}*/
-
 double Map::getHeuristicsTo(const TileNode& node, const TileNode& goal) const
 {
 	PointI diff = node.m_pos - goal.m_pos;
 	return std::hypot(diff.x, diff.y); // TODO - cars, obstacles, angle, etc.
+}
+
+void Map::resetPathFinderCaches()
+{
+	const TileNode::Transition emptyTransition;
+
+	for (TileNode& node : m_tileNodes)
+		node.m_transition = emptyTransition;
 }
 
 TileNode::Transition::Transition(TileNode& from, TileNode& to)
@@ -270,16 +187,44 @@ TileNode::Transition::Transition(TileNode& from, TileNode& to)
 	assert(m_turnedDirection != UNKNOWN);
 }
 
-unsigned TileNode::Transition::getCost() const
+unsigned TileNode::Transition::getCost(const TileNode& thisNode) const
 {
-	static const unsigned NORMAL_COST  = 1;
-	static const unsigned TURN_PENALTY = 1;
+	static const unsigned TURN_PENALTY                  = Map::NORMAL_TURN_COST;
+	static const unsigned TURN_180_PENALTY              = 4 * Map::NORMAL_TURN_COST;
+	static const unsigned WAYPOINT_OUT_OF_ORDER_PENALTY = Map::NORMAL_TURN_COST;      // it's not so good to go through incorrect waypoint
+	static const unsigned ZIGZAZ_TURN_PRIZE             = Map::NORMAL_TURN_COST / 2;  // zigzag turn is better then usual turn
 
-	unsigned cost = NORMAL_COST;
+	unsigned cost = Map::NORMAL_TURN_COST;
 
 	TurnDirection previousTurn = m_cachedParent == nullptr ? m_turnedDirection/*assume no change*/ : m_cachedParent->m_transition.m_turnedDirection;
 	if (m_turnedDirection != previousTurn)
 		cost += TURN_PENALTY;
+
+	TurnDirection minDirection = std::min(m_turnedDirection, previousTurn);
+	TurnDirection maxDirection = std::max(m_turnedDirection, previousTurn);
+
+	if ((minDirection == TurnDirection::LEFT && maxDirection == TurnDirection::RIGHT)
+	 || (minDirection == TurnDirection::UP   && maxDirection == TurnDirection::DOWN))
+	{
+		cost += TURN_180_PENALTY;
+	}
+
+	/*static const std::pair<TurnDirection, TurnDirection> directions180[] = 
+	{
+		{TurnDirection::LEFT,  TurnDirection::RIGHT},
+		{TurnDirection::RIGHT, TurnDirection::LEFT},
+		{TurnDirection::DOWN,  TurnDirection::UP},
+		{TurnDirection::UP,    TurnDirection::DOWN}
+	};*/
+
+	TileNode* prePrevious = m_cachedParent != nullptr ? m_cachedParent->m_transition.m_cachedParent : nullptr;
+	if (prePrevious != nullptr && prePrevious->m_transition.m_turnedDirection == m_turnedDirection)
+	{
+		cost -= ZIGZAZ_TURN_PRIZE;
+	}
+
+	if (thisNode.m_isWaypoint)
+		cost += WAYPOINT_OUT_OF_ORDER_PENALTY;
 
 	return cost;		
 }

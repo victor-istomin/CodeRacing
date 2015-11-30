@@ -53,11 +53,8 @@ public:
 		m_render.fillCircle(destination.x, destination.y, std::hypot(self.getWidth(), self.getHeight()) / 2, color);
 	}
 
-	void renderPath(Map& map, PathFinder& pathFinder, const model::Car& self, const PointD& destinateion)
+	void renderPath(Map& map, const PathFinder::Path& path)
 	{
-		PointD start = PointD(self.getX(), self.getY());
-
-		PathFinder::Path path = pathFinder.getPath(start, PointD(destinateion));
 		std::unique_ptr<PointD> previous;
 
 		for (const PathFinder::TilePathNode& step : path)
@@ -68,11 +65,11 @@ public:
 				m_render.line(previous->x, previous->y, stepPoint.x, stepPoint.y, 0x008800);
 			}
 
-			const char* sign = step.m_turnRelative == PathFinder::TilePathNode::TURN_NONE ? "="
-				: (step.m_turnRelative == PathFinder::TilePathNode::TURN_COUNTER_CLOCKWISE ? "-" : "+");
+			const char* sign = step.m_turnRelative == RelativeTurn::TURN_NONE ? "="
+				: (step.m_turnRelative == RelativeTurn::TURN_COUNTER_CLOCKWISE ? "-" : "+");
 
-			m_render.circle(stepPoint.x + 30, stepPoint.y, 80 - 30, 0x008800);
-			m_render.text(stepPoint.x, stepPoint.y, sign);
+			m_render.circle(stepPoint.x, stepPoint.y, 50, 0x008800);
+			m_render.text(stepPoint.x + 30, stepPoint.y - 30, sign, 0x5555FF);
 
 			if (previous == nullptr)
 				previous.reset(new PointD());

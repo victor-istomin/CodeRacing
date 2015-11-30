@@ -5,6 +5,15 @@
 #include <array>
 #include <cmath>
 
+#ifndef _DEBUG
+#  ifndef NDEBUG
+#    define NDEBUG
+#  endif
+#endif
+
+enum class RelativeTurn { TURN_NONE = 0, TURN_CLOCKWISE, TURN_COUNTER_CLOCKWISE, };
+
+
 struct PointD
 {
 	double x;
@@ -34,8 +43,9 @@ struct PointI
 	int y;
 
 	explicit PointI(int px = 0, int py = 0) : x(px), y(py) {}
-	//explicit PointI(const PointI& p) : x(static_cast<int>(p.x)), y(static_cast<int>(p.y)) {}
+	explicit PointI(const PointD& p) : x(static_cast<int>(p.x)), y(static_cast<int>(p.y)) {}
 
+	PointI& operator=(const PointI& right) { x = right.x; y = right.y; return *this; }
 
 	PointI operator*(double m)       const { return PointI(static_cast<int>(x * m), static_cast<int>(y * m)); }
 	PointI operator/(double m)       const { return PointI(static_cast<int>(x / m), static_cast<int>(y / m)); }
