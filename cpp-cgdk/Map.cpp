@@ -83,14 +83,11 @@ PointD Map::getTurnOuterCorner(int x, int y, const TilePathNode& turn) const
 			{ { AbsoluteDirection::UP,    AbsoluteDirection::LEFT},  model::RIGHT_TOP_CORNER },
 			{ { AbsoluteDirection::RIGHT, AbsoluteDirection::DOWN }, model::RIGHT_TOP_CORNER },
 
-			{ { AbsoluteDirection::RIGHT, AbsoluteDirection::UP},    model::LEFT_BOTTOM_CORNER },
-			{ { AbsoluteDirection::DOWN,  AbsoluteDirection::RIGHT}, model::LEFT_BOTTOM_CORNER },
-
 			{ { AbsoluteDirection::LEFT,  AbsoluteDirection::UP },    model::LEFT_BOTTOM_CORNER },
 			{ { AbsoluteDirection::DOWN,  AbsoluteDirection::RIGHT }, model::LEFT_BOTTOM_CORNER },
 
-			{ { AbsoluteDirection::LEFT,  AbsoluteDirection::UP },    model::LEFT_BOTTOM_CORNER },
-			{ { AbsoluteDirection::DOWN,  AbsoluteDirection::RIGHT }, model::LEFT_BOTTOM_CORNER },
+			{ { AbsoluteDirection::RIGHT, AbsoluteDirection::UP},    model::RIGHT_BOTTOM_CORNER },
+			{ { AbsoluteDirection::DOWN,  AbsoluteDirection::LEFT},  model::RIGHT_BOTTOM_CORNER },
 		};
 
 		TurnTuple thisTurn = {turn.m_turnAbsoluteFrom, turn.m_turnAbsolute/*to*/};
