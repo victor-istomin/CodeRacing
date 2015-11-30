@@ -123,7 +123,7 @@ private:
 	void printFinishStats() const;
 
 	PathFinder::Path getTurnsToWaypoint();
-	PointD getTurnEntryPoint(int x, int y) const;
+	PointD getTurnEntryPoint(const TilePathNode& turn) const;
 };
 
 #endif

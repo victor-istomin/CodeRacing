@@ -1,4 +1,6 @@
 #include "Map.h"
+#include "PathFinder.h"
+
 #include <cassert>
 #include <cmath>
 #include <map>
@@ -40,7 +42,7 @@ void Map::updateNodes()
 	}
 }
 
-PointD Map::getTurnOuterCorner(int x, int y) const
+PointD Map::getTurnOuterCorner(int x, int y, const TilePathNode& turn) const
 {
 	static const double displacement = m_game->getTrackTileMargin() + std::min(m_game->getCarWidth(), m_game->getCarHeight()) / 2;
 	static const double bigDisplacement = m_game->getTrackTileSize() - displacement;
@@ -55,7 +57,60 @@ PointD Map::getTurnOuterCorner(int x, int y) const
 		// others not yet implemented
 	};
 
-	auto displacementIt = displacementMap.find(getTileType(x, y));
+	model::TileType tileType = getTileType(x, y);
+
+	switch (tileType)
+	{
+	case model::LEFT_HEADED_T:
+	case model::RIGHT_HEADED_T:
+	case model::TOP_HEADED_T:
+	case model::BOTTOM_HEADED_T:
+	case model::CROSSROADS:
+	{
+		// T-turn or crossroads handling is similar to corresponding usual turn
+
+		struct TurnTuple 
+		{
+			TilePathNode::AbsoluteTurn from, to; 
+			bool operator==(const TurnTuple&r) const { return from == r.from && to == r.to; }
+		};
+
+		static const std::pair<TurnTuple, model::TileType> turnsToCorner[] =
+		{
+			{ { AbsoluteDirection::UP,   AbsoluteDirection::RIGHT }, model::LEFT_TOP_CORNER },
+			{ { AbsoluteDirection::LEFT, AbsoluteDirection::DOWN },  model::LEFT_TOP_CORNER },
+
+			{ { AbsoluteDirection::UP,    AbsoluteDirection::LEFT},  model::RIGHT_TOP_CORNER },
+			{ { AbsoluteDirection::RIGHT, AbsoluteDirection::DOWN }, model::RIGHT_TOP_CORNER },
+
+			{ { AbsoluteDirection::RIGHT, AbsoluteDirection::UP},    model::LEFT_BOTTOM_CORNER },
+			{ { AbsoluteDirection::DOWN,  AbsoluteDirection::RIGHT}, model::LEFT_BOTTOM_CORNER },
+
+			{ { AbsoluteDirection::LEFT,  AbsoluteDirection::UP },    model::LEFT_BOTTOM_CORNER },
+			{ { AbsoluteDirection::DOWN,  AbsoluteDirection::RIGHT }, model::LEFT_BOTTOM_CORNER },
+
+			{ { AbsoluteDirection::LEFT,  AbsoluteDirection::UP },    model::LEFT_BOTTOM_CORNER },
+			{ { AbsoluteDirection::DOWN,  AbsoluteDirection::RIGHT }, model::LEFT_BOTTOM_CORNER },
+		};
+
+		TurnTuple thisTurn = {turn.m_turnAbsoluteFrom, turn.m_turnAbsolute/*to*/};
+		auto found = std::find_if(std::begin(turnsToCorner), std::end(turnsToCorner), [&thisTurn](const auto& tupleCornerPair) 
+		{
+			return tupleCornerPair.first == thisTurn;
+		});
+
+		if (found != std::end(turnsToCorner))
+		{
+			tileType = found->second;   // assume this crossroad to be usual turn
+		}		
+
+		break;
+	}
+	default:
+		break;
+	}
+
+	auto displacementIt = displacementMap.find(tileType);
 	return getTileCorner(x, y) + (displacementIt != displacementMap.end() ? displacementIt->second : m_tileCenter);
 }
 
@@ -173,18 +228,18 @@ void Map::resetPathFinderCaches()
 
 TileNode::Transition::Transition(TileNode& from, TileNode& to)
 	: m_cachedParent(&from)
-	, m_turnedDirection(UNKNOWN)
+	, m_turnedDirection(AbsoluteDirection::UNKNOWN)
 {
 	if (from.m_pos.x > to.m_pos.x)
-		m_turnedDirection = LEFT;
+		m_turnedDirection = AbsoluteDirection::LEFT;
 	if (from.m_pos.x < to.m_pos.x)
-		m_turnedDirection = RIGHT;
+		m_turnedDirection = AbsoluteDirection::RIGHT;
 	if (from.m_pos.y > to.m_pos.y)
-		m_turnedDirection = UP;
+		m_turnedDirection = AbsoluteDirection::UP;
 	if (from.m_pos.y < to.m_pos.y)
-		m_turnedDirection = DOWN;
+		m_turnedDirection = AbsoluteDirection::DOWN;
 
-	assert(m_turnedDirection != UNKNOWN);
+	assert(m_turnedDirection != AbsoluteDirection::UNKNOWN);
 }
 
 unsigned TileNode::Transition::getCost(const TileNode& thisNode) const
@@ -196,15 +251,15 @@ unsigned TileNode::Transition::getCost(const TileNode& thisNode) const
 
 	unsigned cost = Map::NORMAL_TURN_COST;
 
-	TurnDirection previousTurn = m_cachedParent == nullptr ? m_turnedDirection/*assume no change*/ : m_cachedParent->m_transition.m_turnedDirection;
+	AbsoluteDirection previousTurn = m_cachedParent == nullptr ? m_turnedDirection/*assume no change*/ : m_cachedParent->m_transition.m_turnedDirection;
 	if (m_turnedDirection != previousTurn)
 		cost += TURN_PENALTY;
 
-	TurnDirection minDirection = std::min(m_turnedDirection, previousTurn);
-	TurnDirection maxDirection = std::max(m_turnedDirection, previousTurn);
+	AbsoluteDirection minDirection = std::min(m_turnedDirection, previousTurn);
+	AbsoluteDirection maxDirection = std::max(m_turnedDirection, previousTurn);
 
-	if ((minDirection == TurnDirection::LEFT && maxDirection == TurnDirection::RIGHT)
-	 || (minDirection == TurnDirection::UP   && maxDirection == TurnDirection::DOWN))
+	if ((minDirection == AbsoluteDirection::LEFT && maxDirection == AbsoluteDirection::RIGHT)
+	 || (minDirection == AbsoluteDirection::UP   && maxDirection == AbsoluteDirection::DOWN))
 	{
 		cost += TURN_180_PENALTY;
 	}

@@ -1,35 +1,6 @@
 #pragma once
 #include "Utils.h"
 
-struct TileNode
-{
-	struct Transition
-	{
-		enum TurnDirection
-		{
-			UNKNOWN = 0,
-			// values order is important!
-			LEFT, RIGHT, 
-			UP, DOWN,
-		};
-
-		TileNode*     m_cachedParent;
-		TurnDirection m_turnedDirection;   // which turn performed to move 'parent' -> 'this'
-
-		Transition() : m_cachedParent(nullptr), m_turnedDirection(UNKNOWN) {}
-		Transition(TileNode& from, TileNode& to);
-
-		unsigned getCost(const TileNode& thisNode) const;
-	};
-
-	model::TileType m_type;
-	PointI          m_pos;
-	Transition      m_transition;
-	bool            m_isWaypoint;
-
-	TileNode() : m_type(model::UNKNOWN), m_pos(), m_transition() {}
-};
-
 class Map
 {
 	typedef std::vector< std::vector< model::TileType > > TilesXY;
@@ -75,7 +46,7 @@ public:
 	PointI getTileIndex(const PointD& p)        const { return PointI(p / m_tileSize); }
 	PointD getTileCorner(int x, int y)          const { return PointD(x * m_tileSize, y * m_tileSize); }
 	PointD getTileCenter(int x, int y)          const { return getTileCorner(x, y) + m_tileCenter; }
-	PointD getTurnOuterCorner(int x, int y)     const;
+	PointD getTurnOuterCorner(int x, int y, const TilePathNode& turn) const;
 	
 	size_t getTileNodeIndex(int x, int y) const 
 	{ 

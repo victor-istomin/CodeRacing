@@ -57,7 +57,7 @@ public:
 	{
 		std::unique_ptr<PointD> previous;
 
-		for (const PathFinder::TilePathNode& step : path)
+		for (const TilePathNode& step : path)
 		{
 			PointD stepPoint = map.getTileCenter(step.m_pos.x, step.m_pos.y);
 			if (previous != nullptr)

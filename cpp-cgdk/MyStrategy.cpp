@@ -48,83 +48,22 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	// get next waypoint
 	PathFinder::Path waypointPath = getTurnsToWaypoint();
-	PointI waypointIndex = waypointPath.empty() ? PointI((self.getNextWaypointX(), self.getNextWaypointY())) : waypointPath.front().m_pos;
-	PointD nextWaypoint = getTurnEntryPoint(waypointIndex.x, waypointIndex.y);
+	if (waypointPath.empty())
+	{
+		// safe failsave workaround
+		assert(!waypointPath.empty());
+		TileNode* tileNode = m_map->getTileNodePtr(m_map->getTileNodeIndex(self.getNextWaypointX(), self.getNextWaypointY()));
+		TilePathNode node(*tileNode);
+		node.m_turnRelative = RelativeTurn::TURN_CLOCKWISE;
+	}
+
+	PointD nextWaypoint = getTurnEntryPoint(waypointPath.front());
 
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 
-	bool isPassThruWaypoint = waypointPath.empty() ? false : waypointPath.front().m_turnRelative == RelativeTurn::TURN_NONE; // TODO - fixme
-
-	/* optimize cornering */
-	const double FAR = game.getTrackTileSize() * 1.3;
-	double cornerTileOffset = 0.25 * game.getTrackTileSize();
-	
+	bool isPassThruWaypoint = waypointPath.empty() ? false : waypointPath.front().m_turnRelative == RelativeTurn::TURN_NONE;
 
 	TileType waypointTileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
-	/*
-	switch (waypointTileType)
-	{
-	case LEFT_TOP_CORNER:
-		nextWaypoint.x += cornerTileOffset * offsetDirection;
-		nextWaypoint.y += cornerTileOffset * offsetDirection;
-		break;
-	case RIGHT_TOP_CORNER:
-		nextWaypoint.x -= cornerTileOffset * offsetDirection;
-		nextWaypoint.y += cornerTileOffset * offsetDirection;
-		break;
-	case LEFT_BOTTOM_CORNER:
-		nextWaypoint.x += cornerTileOffset * offsetDirection;
-		nextWaypoint.y -= cornerTileOffset * offsetDirection;
-		break;
-	case RIGHT_BOTTOM_CORNER:
-		nextWaypoint.x -= cornerTileOffset * offsetDirection;
-		nextWaypoint.y -= cornerTileOffset * offsetDirection;
-		break;
-
-	case HORIZONTAL:
-	case VERTICAL:
-	case CROSSROADS:
-		isPassThruWaypoint = true;
-		break;
-
-	case TOP_HEADED_T:
-	if (0){
-		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
-		nextWaypoint = m_map->getTileCorner(waypointIndex.x, waypointIndex.y);
-		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
-
-		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
-		{
-			nextWaypoint = nextWaypoint + PointD(1.3 * m_game->getTrackTileSize(), m_game->getTrackTileSize() - margin);
-		}
-		else
-		{ 
-			nextWaypoint = nextWaypoint + PointD(0.5 * m_game->getTrackTileSize(), 0.5 * m_game->getTrackTileSize());
-		}
-		break;
-	}
-
-	case RIGHT_HEADED_T:
-	if (0) {
-		double margin = game.getTrackTileMargin() + game.getCarWidth() / 2.1;
-		nextWaypoint = m_map->getTileCorner(waypointIndex.x, waypointIndex.y);
-		distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
-
-		if (distanceToWaypoint > game.getTrackTileSize() * 1.7)
-		{
-			nextWaypoint = nextWaypoint + PointD(margin, 1.4 * m_game->getTrackTileSize());
-		}
-		else
-		{
-			nextWaypoint = nextWaypoint + PointD(m_game->getTrackTileSize() + margin, m_game->getTrackTileSize() - margin);
-		}
-		break;
-	}
-
-	default:
-		break;
-	}
-	*/
 
 	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
 	distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
@@ -389,18 +328,18 @@ PathFinder::Path MyStrategy::getTurnsToWaypoint()
 
 	struct AngleConstraints
 	{
-		TileNode::Transition::TurnDirection direction;
+		AbsoluteDirection direction;
 		double angle;
 
-		bool operator==(TileNode::Transition::TurnDirection dir) const { return this->direction == dir; }
+		bool operator==(AbsoluteDirection dir) const { return this->direction == dir; }
 	};
 
 	static const AngleConstraints directionsByAngle[] =
 	{ 
-		{TileNode::Transition::RIGHT, 0},
-		{TileNode::Transition::DOWN,  PI/2},
-		{TileNode::Transition::LEFT,  PI},
-		{TileNode::Transition::UP,    3 * PI / 2}
+		{AbsoluteDirection::RIGHT, 0},
+		{AbsoluteDirection::DOWN,  PI/2},
+		{AbsoluteDirection::LEFT,  PI},
+		{AbsoluteDirection::UP,    3 * PI / 2}
 	};
 
 	static const size_t DIRECTIONS_COUNT = std::extent<decltype(directionsByAngle)>::value;
@@ -432,22 +371,22 @@ PathFinder::Path MyStrategy::getTurnsToWaypoint()
 	for (auto it = path.begin(); it != path.end(); ++it)
 	{
 		auto nextIt = it; ++nextIt;
-		auto turnTo = nextIt == path.end() ? TileNode::Transition::UNKNOWN/*no information*/ : nextIt->m_turnAbsolute;
+		auto turnTo = nextIt == path.end() ? AbsoluteDirection::UNKNOWN/*no information*/ : nextIt->m_turnAbsoluteFrom;
 
 		it->m_turnAbsolute = turnTo;
 	}
 	
 	PathFinder::Path turns;
-	PathFinder::TilePathNode previous = path.front();
+	TilePathNode previous = path.front();
 	currentDirection = previous.m_turnAbsolute;
 
-	for (const PathFinder::TilePathNode& nextTile : path)
+	for (const TilePathNode& nextTile : path)
 	{
 		if (nextTile.m_pos == previous.m_pos)
 			continue;  // skip first tile
 
-		// experimental feature - ignore waypoint if no turn
-		if (/*nextTile.m_isWaypoint || */nextTile.m_turnAbsolute != currentDirection /*turn*/)
+		// ignore waypoint if no turn
+		if (nextTile.m_turnAbsolute != currentDirection /*turn*/)
 		{
 			turns.emplace_back(nextTile);
 
@@ -455,6 +394,7 @@ PathFinder::Path MyStrategy::getTurnsToWaypoint()
 			auto turnRelative = (nextTile.m_turnAbsolute == clockwise) ? RelativeTurn::TURN_CLOCKWISE : RelativeTurn::TURN_COUNTER_CLOCKWISE;
 
 			// if waypoint and no turn
+			// TODO - dead if?
 			if (nextTile.m_isWaypoint && nextTile.m_turnAbsolute == currentDirection)
 				turnRelative = RelativeTurn::TURN_NONE;
 
@@ -470,9 +410,12 @@ PathFinder::Path MyStrategy::getTurnsToWaypoint()
 	return turns;
 }
 
-PointD MyStrategy::getTurnEntryPoint(int x, int y) const
+PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 {
 	static const double FAR_DISTANCE = m_game->getTrackTileSize() * 1.7;
+
+	int x = turn.m_pos.x;
+	int y = turn.m_pos.y;
 
 	PointD turnCenter      = m_map->getTileCenter(x, y);
 	PointI selfTileIndex   = m_map->getTileIndex(PointD(m_self->getX(), m_self->getY()));
@@ -486,7 +429,7 @@ PointD MyStrategy::getTurnEntryPoint(int x, int y) const
 		return turnCenter;
 	}
 
-	PointD entry = m_map->getTurnOuterCorner(x, y);
+	PointD entry = m_map->getTurnOuterCorner(x, y, turn);
 	double towardsDisplacement = isFarFrom ? m_game->getTrackTileSize() * 1.3 : m_game->getTrackTileSize() / 2;
 
 	if (isHorizontalEnrty)

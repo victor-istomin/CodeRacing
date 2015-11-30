@@ -108,9 +108,10 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 	return path;
 }
 
-PathFinder::TilePathNode::TilePathNode(const TileNode& node)
+TilePathNode::TilePathNode(const TileNode& node)
 	: m_pos(node.m_pos)
-	, m_turnAbsolute(node.m_transition.m_turnedDirection)
+	, m_turnAbsolute(AbsoluteDirection::UNKNOWN)
+	, m_turnAbsoluteFrom(node.m_transition.m_turnedDirection)
 	, m_turnRelative(RelativeTurn::TURN_NONE)
 	, m_isWaypoint(node.m_isWaypoint)
 {

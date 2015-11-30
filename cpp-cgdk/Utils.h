@@ -11,9 +11,6 @@
 #  endif
 #endif
 
-enum class RelativeTurn { TURN_NONE = 0, TURN_CLOCKWISE, TURN_COUNTER_CLOCKWISE, };
-
-
 struct PointD
 {
 	double x;
@@ -57,4 +54,46 @@ struct PointI
 	bool operator==(const PointI& p) const { return x == p.x && y == p.y; }
 };
 
+enum class RelativeTurn { TURN_NONE = 0, TURN_CLOCKWISE, TURN_COUNTER_CLOCKWISE, };
 
+enum class AbsoluteDirection
+{
+	UNKNOWN = 0,
+	// values order is important!
+	LEFT, RIGHT,
+	UP, DOWN,
+};
+
+struct TileNode
+{
+	struct Transition
+	{
+		TileNode*         m_cachedParent;
+		AbsoluteDirection m_turnedDirection;   // which turn performed to move 'parent' -> 'this'
+
+		Transition() : m_cachedParent(nullptr), m_turnedDirection(AbsoluteDirection::UNKNOWN) {}
+		Transition(TileNode& from, TileNode& to);
+
+		unsigned getCost(const TileNode& thisNode) const;
+	};
+
+	model::TileType m_type;
+	PointI          m_pos;
+	Transition      m_transition;
+	bool            m_isWaypoint;
+
+	TileNode() : m_type(model::UNKNOWN), m_pos(), m_transition() {}
+};
+
+struct TilePathNode
+{
+	typedef AbsoluteDirection AbsoluteTurn; // TODO - remove this typedef
+
+	PointI       m_pos;
+	AbsoluteTurn m_turnAbsolute;
+	AbsoluteTurn m_turnAbsoluteFrom;
+	RelativeTurn m_turnRelative;
+	bool         m_isWaypoint;
+
+	explicit TilePathNode(const TileNode& node);
+};
