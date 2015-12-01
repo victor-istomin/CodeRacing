@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <map>
+#include <algorithm>
 
 Map::Map(const model::Game& game, const model::World& world)
 	: m_tiles(world.getTilesXY())
@@ -75,7 +76,8 @@ PointD Map::getTurnOuterCorner(int x, int y, const TilePathNode& turn) const
 			bool operator==(const TurnTuple&r) const { return from == r.from && to == r.to; }
 		};
 
-		static const std::pair<TurnTuple, model::TileType> turnsToCorner[] =
+		typedef std::pair<TurnTuple, model::TileType> TurnsCornerPair;
+		static const TurnsCornerPair turnsToCorner[] =
 		{
 			{ { AbsoluteDirection::UP,   AbsoluteDirection::RIGHT }, model::LEFT_TOP_CORNER },
 			{ { AbsoluteDirection::LEFT, AbsoluteDirection::DOWN },  model::LEFT_TOP_CORNER },
@@ -91,7 +93,7 @@ PointD Map::getTurnOuterCorner(int x, int y, const TilePathNode& turn) const
 		};
 
 		TurnTuple thisTurn = {turn.m_turnAbsoluteFrom, turn.m_turnAbsolute/*to*/};
-		auto found = std::find_if(std::begin(turnsToCorner), std::end(turnsToCorner), [&thisTurn](const auto& tupleCornerPair) 
+		auto found = std::find_if(std::begin(turnsToCorner), std::end(turnsToCorner), [&thisTurn](const TurnsCornerPair& tupleCornerPair) 
 		{
 			return tupleCornerPair.first == thisTurn;
 		});
