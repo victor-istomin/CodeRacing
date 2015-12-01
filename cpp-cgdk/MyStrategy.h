@@ -3,13 +3,17 @@
 #ifndef _MY_STRATEGY_H_
 #define _MY_STRATEGY_H_
 
-#include "Strategy.h"
-#include "Utils.h"
 #include <cmath>
 #include <cstdint>
 #include <numeric>
 #include <type_traits>
 #include <memory>
+
+#include "Strategy.h"
+#include "Utils.h"
+#include "PathFinder.h"
+
+class Map;
 
 #ifdef _DEBUG
 # include "DebugVisualizer.h"
@@ -20,7 +24,8 @@ struct DebugVisualizer
 	void preRenderFinish() { }
 
 	void renderWypoints(const Map&, const model::Game&, const model::World&, const model::Car&) {}
-	void renderMoveTarget(const model::Car&, const model::Move&, const Point&) {}
+	void renderMoveTarget(const model::Car&, const model::Move&, const PointD&) {}
+	void renderPath(Map&, const PathFinder::Path&) {}
 };
 #endif
 
@@ -28,16 +33,20 @@ struct DebugMessage
 {
 	DebugVisualizer&    m_v;
 
-	const Map&          m_map;
+	Map&                m_map;
 	const model::Car&   m_self;
 	const model::World& m_world;
 	const model::Game&  m_game;
 	const model::Move&  m_move;
+	const PathFinder::Path& m_turnsToWaypoint;
 
-	Point m_destination;
 
-	DebugMessage(DebugVisualizer& v, const Map& map, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move)
-		: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move)
+	PointD m_destination;
+
+	DebugMessage(DebugVisualizer& v, Map& map
+		, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move
+		, const PathFinder::Path& turnsToWaypoint)
+			: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move), m_turnsToWaypoint(turnsToWaypoint)
 	{
 	}
 
@@ -47,6 +56,8 @@ struct DebugMessage
 		m_v.preRenderStart();
 		m_v.renderWypoints(m_map, m_game, m_world, m_self);
 		m_v.renderMoveTarget(m_self, m_move, m_destination);
+		m_v.renderPath(m_map, m_turnsToWaypoint);
+
 		m_v.preRenderFinish();
 	}
 };
@@ -91,14 +102,15 @@ private:
 	const model::Game*  m_game;
 	const model::Move*  m_move;
 
-	Statistics           m_statistics;
-	std::unique_ptr<Map> m_map;
+	Statistics                  m_statistics;
+	std::unique_ptr<Map>        m_map;
+	std::unique_ptr<PathFinder> m_pathFinder;
 
-	DebugVisualizer      m_debug;
+	DebugVisualizer       m_debug;
 
 	void updateStates(const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move);
 
-	void shootEnemy(Move &move);
+	void shootEnemy(model::Move &move);
 	bool IsOilDanger() const;
 
 	void simulateBreaking(double desiredSpeed, int &ticksToBrake, double &distanceToBrake) const;
@@ -117,6 +129,9 @@ private:
 	}
 
 	void printFinishStats() const;
+
+	PathFinder::Path getTurnsToWaypoint();
+	PointD getTurnEntryPoint(const TilePathNode& turn) const;
 };
 
 #endif

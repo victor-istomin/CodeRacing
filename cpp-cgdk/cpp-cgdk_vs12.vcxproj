@@ -88,7 +88,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Debug.cpp" />
+    <ClCompile Include="Map.cpp" />
     <ClCompile Include="MyStrategy.cpp" />
+    <ClCompile Include="PathFinder.cpp" />
     <ClCompile Include="RemoteProcessClient.cpp" />
     <ClCompile Include="Runner.cpp" />
     <ClCompile Include="Strategy.cpp" />
@@ -111,7 +113,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DebugVisualizer.h" />
+    <ClInclude Include="Map.h" />
     <ClInclude Include="MyStrategy.h" />
+    <ClInclude Include="PathFinder.h" />
     <ClInclude Include="RemoteProcessClient.h" />
     <ClInclude Include="Runner.h" />
     <ClInclude Include="Strategy.h" />
