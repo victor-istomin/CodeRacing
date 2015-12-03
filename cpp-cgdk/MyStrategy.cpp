@@ -178,32 +178,59 @@ double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypoint
 		corneringSpeed /= 2;
 
 
-	static const int SAFE_TURN_DISTANCE = 2;
-	static const int SAFEST_TURN_DISTANCE = 4;
+	static const int SAFE_TURN_DISTANCE    = 2;
+	static const int SAFEST_TURN_DISTANCE  = 4;
+	static const int NO_ACTUAL_TURN_MARKER = 6;
 	
 	int futureTurnDistance = SAFE_TURN_DISTANCE; 
 	if (waypointPath.size() > 1)
 	{
-		const auto& thisTurn       = waypointPath.front();
+		const auto& thisTurn = waypointPath.front();
 		const auto& futureWaypoint = *(++waypointPath.begin());
 
 		futureTurnDistance = futureWaypoint.m_turnAbsolute != AbsoluteDirection::UNKNOWN 
-			? static_cast<int>(thisTurn.m_pos.distanceTo(futureWaypoint.m_pos))
+			? static_cast<int>(thisTurn.m_pos.distanceTo(futureWaypoint.m_pos))           // distance in tiles, not it points
 			: SAFE_TURN_DISTANCE;
 
 		if (futureWaypoint.m_isZigZag && thisTurn.m_isZigZag)
-			futureTurnDistance = SAFEST_TURN_DISTANCE;
+			futureTurnDistance = SAFE_TURN_DISTANCE;
+
+		static int FORWARD_TURNS_LOOKUP = 2; 
+		PointD thisTurnPoint = getTurnEntryPoint(thisTurn);
+		double maxTurnAngle = m_self->getAngleTo(thisTurnPoint.x, thisTurnPoint.y);
+
+		if (thisTurn.m_isZigZag && futureWaypoint.m_isZigZag)
+		{
+			int turnsIndex = 0;
+			auto itFuture = waypointPath.begin();
+			while (turnsIndex++ < FORWARD_TURNS_LOOKUP && itFuture != waypointPath.end())
+			{
+				++itFuture;
+				PointD turnPoint = getTurnEntryPoint(*itFuture);  // TODO - check carefully, entry point is neither horizontal nor vertical!
+
+				maxTurnAngle = std::max(maxTurnAngle, std::abs(m_self->getAngleTo(turnPoint.x, turnPoint.y)));
+			}
+
+			static double NO_TURN_THRESHOLD = PI / 8; // 22.5 degrees
+			if (maxTurnAngle < NO_TURN_THRESHOLD)
+				futureTurnDistance = NO_ACTUAL_TURN_MARKER;
+		}
 	}
+
 
 	// TODO - improve this after zigzag improvement
 	// BUG (minor): issue with safest turn detection on 'default, map01, map02' maps
 
 	static const double FAST_SPEED_FACTOR    = 1.25;
 	static const double FASTEST_SPEED_FACTOR = 1.15;
+	static const double NO_TURN_FACTOR       = 3;
+
 	if (futureTurnDistance >= SAFE_TURN_DISTANCE)
 		corneringSpeed *= FAST_SPEED_FACTOR;
 	if (futureTurnDistance >= SAFEST_TURN_DISTANCE) // not 'else if'
 		corneringSpeed *= FASTEST_SPEED_FACTOR;
+	if (futureTurnDistance >= NO_ACTUAL_TURN_MARKER)
+		corneringSpeed *= NO_TURN_FACTOR;
 
 	return corneringSpeed;
 }
@@ -485,6 +512,8 @@ Path MyStrategy::getTurnsToWaypoint()
 	
 	auto currentDirection = relativeAngles[0].direction; // closest angle constraint
 	size_t directionQuarter = std::find(std::begin(directionsByAngle), std::end(directionsByAngle), currentDirection) - std::begin(directionsByAngle);
+
+	// TODO - avoid unnecessary zigzag turns?
 
 	// calculate turns
 	Path path        = m_pathFinder->getPath(current, waypoint);
