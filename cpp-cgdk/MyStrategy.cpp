@@ -250,11 +250,12 @@ void MyStrategy::shootEnemy(model::Move& move)
 		auto carToShoot = std::find_if(m_world->getCars().cbegin(), m_world->getCars().cend(), 
 			[this, &selfTrajectory, &selfPoint, &selfSpeed, projectileSpeedX, projectileSpeedY](const Car& car)
 		{
-			static const double MAX_SHOOT_DISTANCE  = m_game->getTrackTileSize() * 2;
-			static const double MAX_LOOKUP_DISTANCE = 2 * MAX_SHOOT_DISTANCE;
+			static const double MAX_SHOOT_DISTANCE   = m_game->getTrackTileSize() * 2;
+			static const double MAX_LOOKUP_DISTANCE  = 2 * MAX_SHOOT_DISTANCE;
 			static const double SHORT_SHOOT_DISTANCE = m_game->getTrackTileSize() * 1.5;
 
-			if (car.isTeammate() || m_self->getDistanceTo(car) > MAX_LOOKUP_DISTANCE)
+			if (car.isTeammate() || m_self->getDistanceTo(car) > MAX_LOOKUP_DISTANCE 
+			 || car.getDurability() < 0.0001 || car.isFinishedTrack())
 				return false;    // TODO - check to don't injure teammate
 
 			if (m_self->getType() == model::BUGGY && m_self->getDistanceTo(car) < SHORT_SHOOT_DISTANCE
