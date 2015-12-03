@@ -190,13 +190,16 @@ double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypoint
 		futureTurnDistance = futureWaypoint.m_turnAbsolute != AbsoluteDirection::UNKNOWN 
 			? static_cast<int>(thisTurn.m_pos.distanceTo(futureWaypoint.m_pos))
 			: SAFE_TURN_DISTANCE;
+
+		if (futureWaypoint.m_isZigZag && thisTurn.m_isZigZag)
+			futureTurnDistance = SAFEST_TURN_DISTANCE;
 	}
 
 	// TODO - improve this after zigzag improvement
 	// BUG (minor): issue with safest turn detection on 'default, map01, map02' maps
 
 	static const double FAST_SPEED_FACTOR    = 1.25;
-	static const double FASTEST_SPEED_FACTOR = 1.25;
+	static const double FASTEST_SPEED_FACTOR = 1.15;
 	if (futureTurnDistance >= SAFE_TURN_DISTANCE)
 		corneringSpeed *= FAST_SPEED_FACTOR;
 	if (futureTurnDistance >= SAFEST_TURN_DISTANCE) // not 'else if'
