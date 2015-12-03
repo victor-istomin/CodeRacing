@@ -79,11 +79,12 @@ struct TileNode
 	{
 		TileNode*         m_cachedParent;
 		AbsoluteDirection m_turnedDirection;   // which turn performed to move 'parent' -> 'this'
+		bool              m_isZigzag;
 
-		Transition() : m_cachedParent(nullptr), m_turnedDirection(AbsoluteDirection::UNKNOWN) {}
+		Transition() : m_cachedParent(nullptr), m_turnedDirection(AbsoluteDirection::UNKNOWN), m_isZigzag(false) {}
 		Transition(TileNode& from, TileNode& to);
 
-		unsigned getCost(const TileNode& thisNode) const;
+		unsigned getCost(const TileNode& thisNode);
 	};
 
 	model::TileType m_type;
@@ -103,6 +104,7 @@ struct TilePathNode
 	AbsoluteTurn m_turnAbsoluteFrom;
 	RelativeTurn m_turnRelative;
 	bool         m_isWaypoint;
+	bool         m_isZigZag;
 
 	explicit TilePathNode(const TileNode& node);
 };

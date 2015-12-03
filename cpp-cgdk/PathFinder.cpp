@@ -63,7 +63,7 @@ Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 			TileNode::Transition newTransition = TileNode::Transition(*currentNode, *candidate);
 
-			double newTransitionCost = newTransition.getCost(*candidate);
+			double newTransitionCost = newTransition.getCost(*candidate);  // ... and calculate zigzag move
 			double newGx = currentGx + newTransitionCost;
 			double heuristics = map.getHeuristicsTo(*candidate, *finish); // TODO - can change or can not? This matters in closed node improvement
 			double newFx = newGx + heuristics;
@@ -115,6 +115,7 @@ TilePathNode::TilePathNode(const TileNode& node)
 	, m_turnAbsoluteFrom(node.m_transition.m_turnedDirection)
 	, m_turnRelative(RelativeTurn::TURN_NONE)
 	, m_isWaypoint(node.m_isWaypoint)
+	, m_isZigZag(node.m_transition.m_isZigzag)
 {
 	// TODO - actualy, relative turn does not works
 }

@@ -497,10 +497,12 @@ Path MyStrategy::getTurnsToWaypoint()
 	// convert 'went from' directions to 'turn to' directions
 	for (auto it = path.begin(); it != path.end(); ++it)
 	{
-		auto nextIt = it; ++nextIt;
-		auto turnTo = nextIt == path.end() ? AbsoluteDirection::UNKNOWN/*no information*/ : nextIt->m_turnAbsoluteFrom;
+		auto nextIt   = it; ++nextIt;
+		auto turnTo   = nextIt == path.end() ? AbsoluteDirection::UNKNOWN/*no information*/ : nextIt->m_turnAbsoluteFrom;
+		bool isZigzag = nextIt == path.end() ? false : nextIt->m_isZigZag;
 
 		it->m_turnAbsolute = turnTo;
+		it->m_isZigZag = isZigzag;
 	}
 	
 	Path turns;
@@ -561,7 +563,12 @@ PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 
 	if (isHorizontalEnrty)
 	{
-		double centerDisplacement  = 1.8 * (turnCenter.y - entry.y);  // TODO - avoid magic
+		double centerDisplacement  = 2 * (turnCenter.y - entry.y);  // TODO - avoid magic
+		if (turn.m_isZigZag)
+		{
+			//centerDisplacement *= 0.80;  // less center displacement for zigzag
+			//towardsDisplacement *= 0.85;
+		}
 
 		entry.x += (selfTileIndex.x > x ? 1 : -1) * towardsDisplacement;
 		entry.y += isFarFrom ? 0 : centerDisplacement;
@@ -569,7 +576,12 @@ PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 
 	if (isVerticalEntry)
 	{
-		double centerDisplacement = 1.8  * (turnCenter.x - entry.x);  // TODO - avoid magic
+		double centerDisplacement = 2  * (turnCenter.x - entry.x);  // TODO - avoid magic
+		if (turn.m_isZigZag)
+		{
+			//centerDisplacement *= 0.80;  // less center displacement for zigzag
+			//towardsDisplacement *= 0.85;
+		}
 
 		entry.y += (selfTileIndex.y > y ? 1 : -1) * towardsDisplacement;
 		entry.x += isFarFrom ? 0 : centerDisplacement;

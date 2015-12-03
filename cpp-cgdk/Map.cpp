@@ -197,10 +197,10 @@ bool Map::incrementTileNodeIndex(const TileNode& initial, Direction incrementTo,
 		&& incremented.x >= 0 && incremented.x < m_worldWidthTiles && incremented.y >= 0 && incremented.y < m_worldHeightTiles;
 }
 
-double Map::getCostFromStart(const TileNode& node) const
+double Map::getCostFromStart(TileNode& node) const
 {
 	unsigned cost = 0;
-	const TileNode* parent = node.m_transition.m_cachedParent;
+	TileNode* parent = node.m_transition.m_cachedParent;
 
 	while (parent != nullptr)
 	{
@@ -228,6 +228,7 @@ void Map::resetPathFinderCaches()
 TileNode::Transition::Transition(TileNode& from, TileNode& to)
 	: m_cachedParent(&from)
 	, m_turnedDirection(AbsoluteDirection::UNKNOWN)
+	, m_isZigzag(false)
 {
 	if (from.m_pos.x > to.m_pos.x)
 		m_turnedDirection = AbsoluteDirection::LEFT;
@@ -241,7 +242,7 @@ TileNode::Transition::Transition(TileNode& from, TileNode& to)
 	assert(m_turnedDirection != AbsoluteDirection::UNKNOWN);
 }
 
-unsigned TileNode::Transition::getCost(const TileNode& thisNode) const
+unsigned TileNode::Transition::getCost(const TileNode& thisNode)
 {
 	static const unsigned TURN_PENALTY                  = Map::NORMAL_TURN_COST;
 	static const unsigned TURN_180_PENALTY              = 4 * Map::NORMAL_TURN_COST;
@@ -272,10 +273,19 @@ unsigned TileNode::Transition::getCost(const TileNode& thisNode) const
 	};*/
 
 	TileNode* prePrevious = m_cachedParent != nullptr ? m_cachedParent->m_transition.m_cachedParent : nullptr;
-	if (prePrevious != nullptr && prePrevious->m_transition.m_turnedDirection == m_turnedDirection)
+	bool isZigzag = m_isZigzag // already calculated
+		|| ( prePrevious != nullptr
+		  && prePrevious->m_transition.m_turnedDirection == m_turnedDirection
+		  && m_cachedParent->m_transition.m_turnedDirection != m_turnedDirection );
+
+	if (isZigzag)
 	{
 		cost -= ZIGZAZ_TURN_PRIZE;
 	}
+
+	m_isZigzag = isZigzag;
+	if (m_cachedParent != nullptr)
+		m_cachedParent->m_transition.m_isZigzag = isZigzag;
 
 	if (thisNode.m_isWaypoint)
 		cost += WAYPOINT_OUT_OF_ORDER_PENALTY;
