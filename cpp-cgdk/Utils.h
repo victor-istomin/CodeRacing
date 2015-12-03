@@ -16,9 +16,9 @@ struct PointD
 	double x;
 	double y;
 
+	explicit PointD(double px = 0, double py = 0) : x(px), y(py)                   {}
+	explicit PointD(const model::Unit& unit)      : x(unit.getX()), y(unit.getY()) {}
 	static const double k_epsilon;
-
-	explicit PointD(double px = 0, double py = 0) : x(px), y(py) {}
 
 	PointD  operator*(double m)       const  { return PointD(x * m, y * m); }
 	PointD  operator/(double m)       const  { return PointD(x / m, y / m); }

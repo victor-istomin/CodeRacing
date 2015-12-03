@@ -2,6 +2,7 @@
 #include "Utils.h"
 #include "Map.h"
 #include "PathFinder.h"
+#include "LineEquation.h"
 
 #define PI 3.14159265358979323846
 #define _USE_MATH_DEFINES
@@ -25,6 +26,12 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	updateStates(self, world, game, move);
 	PathFinder::Path turnsAhead = getTurnsToWaypoint();
 	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move, turnsAhead);
+
+	/*
+	if (world.getTick() < 1000)
+		return;
+	/**/
+
 
 	shootEnemy(move);
 	
@@ -164,17 +171,60 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	printFinishStats();
 }
 
-void MyStrategy::shootEnemy(Move &move)
+void MyStrategy::shootEnemy(model::Move& move)
 {
-	// it's good idea to shoot an enemy...
-	if (m_self->getProjectileCount() > 0)
+
+	if (m_self->getProjectileCount() > 0 && m_self->getRemainingProjectileCooldownTicks() == 0)
 	{
-		auto carToShoot = std::find_if(m_world->getCars().cbegin(), m_world->getCars().cend(), [this](const Car& car)
+		const PointD selfPoint = PointD(*m_self);
+		const Vec2<double> selfSpeed = Vec2<double>(m_self->getSpeedX(), m_self->getSpeedY());
+		const LineEquation selfTrajectory = LineEquation::fromDirectionVector(selfPoint, selfSpeed);
+
+		const double projectileSpeedX = m_game->getWasherInitialSpeed() * std::cos(m_self->getAngle());
+		const double projectileSpeedY = m_game->getWasherInitialSpeed() * std::sin(m_self->getAngle());
+
+		auto carToShoot = std::find_if(m_world->getCars().cbegin(), m_world->getCars().cend(), 
+			[this, &selfTrajectory, &selfPoint, &selfSpeed, projectileSpeedX, projectileSpeedY](const Car& car)
 		{
-			const double scope = 1 * PI / 180;
-			return !car.isTeammate()
-				&& m_self->getDistanceTo(car) < m_game->getTrackTileSize() * 1.5
-				&& std::abs(m_self->getAngleTo(car)) < scope;
+			static const double MAX_SHOOT_DISTANCE  = m_game->getTrackTileSize() * 2;
+			static const double MAX_LOOKUP_DISTANCE = 2 * MAX_SHOOT_DISTANCE;
+
+			if (car.isTeammate() || m_self->getDistanceTo(car) > MAX_LOOKUP_DISTANCE)
+				return false;    // TODO - check to don't injure teammate
+
+			Vec2<double> carSpeed = Vec2<double>(car.getSpeedX(), car.getSpeedY());
+			LineEquation unitTrajectory = LineEquation::fromDirectionVector(PointD(car), carSpeed);
+			PointD intersection;
+			if (!selfTrajectory.isIntersects(unitTrajectory, intersection) 
+			  || intersection.distanceTo(selfPoint) > MAX_SHOOT_DISTANCE )
+				return false;
+
+			// todo
+			double projectileAngle = m_self->getAngleTo(intersection.x, intersection.y);
+			if (std::abs(projectileAngle) > (m_game->getSideWasherAngle() / 2))
+				return false;  // ok?
+
+			double carAngle = car.getAngle() + car.getAngleTo(intersection.x, intersection.y);
+			double carArriveSpeed = car.getSpeedX() * std::cos(carAngle) + car.getSpeedY() * std::sin(carAngle);
+			double carTicksToHit = std::hypot(intersection.x - car.getX(), intersection.y - car.getY()) / carArriveSpeed;
+
+			double projectileArriveSpeed = m_game->getWasherInitialSpeed() * std::cos(projectileAngle);
+			double projectileTicksToHit = std::hypot(intersection.x - selfPoint.x, intersection.y - selfPoint.y) / projectileArriveSpeed;
+
+			int ticksEpsilon = std::max(5.0, std::hypot(car.getHeight(), car.getWidth()) / carArriveSpeed / 4);
+
+			bool shouldHit = std::abs(projectileTicksToHit - carTicksToHit) < ticksEpsilon;
+			double distance = intersection.distanceTo(selfPoint);
+			double minDistance = m_self->getType() == model::JEEP ? 1.5 * std::max(car.getWidth(), car.getHeight()) : 0;
+			if (shouldHit && m_self->getType() == model::JEEP && distance > minDistance)
+			{
+				// don't shoot from jeep over walls and don't shoot oneself with ricochet
+				distance = std::max(m_game->getTrackTileSize(), distance);
+				PathFinder::Path pathToIntersection = m_pathFinder->getPath(selfPoint, intersection);
+				shouldHit = (pathToIntersection.size() - 1) * m_game->getTrackTileSize() < 2/*disgonal*/ * distance + m_game->getTrackTileSize();
+			}
+
+			return shouldHit;
 		});
 
 		if (carToShoot != m_world->getCars().end())
@@ -198,6 +248,7 @@ bool MyStrategy::IsOilDanger() const
 	{
 		double distanceToSlick = m_self->getDistanceTo(slick);
 
+		// todo: single variable?
 		double xTicksToSlick = (slick.getX() - m_self->getX()) / m_self->getSpeedX();
 		double yTicksToSlick = (slick.getY() - m_self->getY()) / m_self->getSpeedY();
 		bool   canIntersect = xTicksToSlick >= 0 && yTicksToSlick > 0;

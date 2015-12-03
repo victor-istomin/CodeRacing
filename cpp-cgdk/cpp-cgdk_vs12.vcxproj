@@ -114,6 +114,7 @@
   <ItemGroup>
     <ClInclude Include="DebugVisualizer.h" />
     <ClInclude Include="Map.h" />
+    <ClInclude Include="LineEquation.h" />
     <ClInclude Include="MyStrategy.h" />
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="RemoteProcessClient.h" />
@@ -143,6 +144,7 @@
     <ClInclude Include="csimplesocket\SimpleSocket.h" />
     <ClInclude Include="csimplesocket\StatTimer.h" />
     <ClInclude Include="Utils.h" />
+    <ClInclude Include="Vec2.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

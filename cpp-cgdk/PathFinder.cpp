@@ -18,15 +18,16 @@ PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
 
 	HashedNodes closedSet;
 
+	Path path;
 	TileNode* start  = map.getTileNodePtr(map.getTileNodeIndex(from));
 	TileNode* finish = map.getTileNodePtr(map.getTileNodeIndex(to));
+	if (finish->m_type == model::EMPTY)
+		return path;
 
 	CostNodeMap openSet;
 	HashedNodes openSetHash;
 	openSet.insert(std::make_pair(map.getHeuristicsTo(*start, *finish), start));
 	openSetHash.insert(start);
-
-	Path path;
 	
 	while (!openSet.empty())
 	{
