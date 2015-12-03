@@ -26,7 +26,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move, turnsAhead);
 
 	/*
-	if (world.getTick() < 1000)
+	if (world.getTick() < 300)
 		return;
 	/**/
 
@@ -222,9 +222,16 @@ void MyStrategy::shootEnemy(model::Move& move)
 		{
 			static const double MAX_SHOOT_DISTANCE  = m_game->getTrackTileSize() * 2;
 			static const double MAX_LOOKUP_DISTANCE = 2 * MAX_SHOOT_DISTANCE;
+			static const double SHORT_SHOOT_DISTANCE = m_game->getTrackTileSize() * 1.5;
 
 			if (car.isTeammate() || m_self->getDistanceTo(car) > MAX_LOOKUP_DISTANCE)
 				return false;    // TODO - check to don't injure teammate
+
+			if (m_self->getType() == model::BUGGY && m_self->getDistanceTo(car) < SHORT_SHOOT_DISTANCE
+				&& std::abs(m_self->getAngleTo(car)) < (m_game->getSideWasherAngle() / 2))
+			{
+				return true; // force shoot from buggy on short distance
+			}
 
 			Vec2<double> carSpeed = Vec2<double>(car.getSpeedX(), car.getSpeedY());
 			LineEquation unitTrajectory = LineEquation::fromDirectionVector(PointD(car), carSpeed);
@@ -245,7 +252,7 @@ void MyStrategy::shootEnemy(model::Move& move)
 			double projectileArriveSpeed = m_game->getWasherInitialSpeed() * std::cos(projectileAngle);
 			double projectileTicksToHit = std::hypot(intersection.x - selfPoint.x, intersection.y - selfPoint.y) / projectileArriveSpeed;
 
-			int ticksEpsilon = std::max(5.0, std::hypot(car.getHeight(), car.getWidth()) / carArriveSpeed / 4);
+			double ticksEpsilon = std::max(5.0, std::hypot(car.getHeight(), car.getWidth()) / carArriveSpeed / 4);
 
 			bool shouldHit = std::abs(projectileTicksToHit - carTicksToHit) < ticksEpsilon;
 			double distance = intersection.distanceTo(selfPoint);
