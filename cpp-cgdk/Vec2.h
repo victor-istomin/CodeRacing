@@ -1,5 +1,5 @@
 #pragma once
-
+#include "Utils.h"
 #include <cmath>
 
 
@@ -33,7 +33,7 @@ public:
 
 	Vec2& rotate(double deg) 
 	{
-		double theta = deg / 180.0 * M_PI;
+		double theta = deg / 180.0 * PI;
 		double c = cos(theta);
 		double s = sin(theta);
 		double tx = m_x * c - m_y * s;

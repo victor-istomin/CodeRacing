@@ -25,7 +25,7 @@ struct DebugVisualizer
 
 	void renderWypoints(const Map&, const model::Game&, const model::World&, const model::Car&) {}
 	void renderMoveTarget(const model::Car&, const model::Move&, const PointD&) {}
-	void renderPath(Map&, const PathFinder::Path&) {}
+	void renderPath(Map&, const Path&) {}
 };
 #endif
 
@@ -38,14 +38,14 @@ struct DebugMessage
 	const model::World& m_world;
 	const model::Game&  m_game;
 	const model::Move&  m_move;
-	const PathFinder::Path& m_turnsToWaypoint;
+	const Path& m_turnsToWaypoint;
 
 
 	PointD m_destination;
 
 	DebugMessage(DebugVisualizer& v, Map& map
 		, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move
-		, const PathFinder::Path& turnsToWaypoint)
+		, const Path& turnsToWaypoint)
 			: m_v(v), m_map(map), m_self(self), m_world(world), m_game(game), m_move(move), m_turnsToWaypoint(turnsToWaypoint)
 	{
 	}
@@ -64,14 +64,14 @@ struct DebugMessage
 
 class MyStrategy : public Strategy 
 {
-	static const int CORNERING_SPEED_CAREFUL = 7;
-	static const int CORNERING_SPEED_REGULAR = 10;
-	static const int CORNERING_SPEED_OILED   = 5;
-
 public:
+	typedef std::list<TilePathNode> Path;
+
 	MyStrategy();
 
 	void move(const model::Car& self, const model::World& world, const model::Game& game, model::Move& move);
+
+	double calculateCorneringSpeed(const model::Car &self, const Path& waypointPath, model::TileType waypointTileType, bool& isVeryCareful) const;
 
 private:
 	struct Statistics
@@ -130,7 +130,7 @@ private:
 
 	void printFinishStats() const;
 
-	PathFinder::Path getTurnsToWaypoint();
+	Path getTurnsToWaypoint();
 	PointD getTurnEntryPoint(const TilePathNode& turn) const;
 };
 

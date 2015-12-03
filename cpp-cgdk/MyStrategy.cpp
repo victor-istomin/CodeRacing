@@ -4,8 +4,6 @@
 #include "PathFinder.h"
 #include "LineEquation.h"
 
-#define PI 3.14159265358979323846
-#define _USE_MATH_DEFINES
 const double PointD::k_epsilon = 0.001;
 
 
@@ -24,7 +22,7 @@ const double MyStrategy::k_angleFactor = 32.0 / PI;
 void MyStrategy::move(const Car& self, const World& world, const Game& game, Move& move)
 {
 	updateStates(self, world, game, move);
-	PathFinder::Path turnsAhead = getTurnsToWaypoint();
+	Path turnsAhead = getTurnsToWaypoint();
 	DebugMessage debug = DebugMessage(m_debug, *m_map, self, world, game, move, turnsAhead);
 
 	/*
@@ -38,7 +36,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	move.setEnginePower(1.0);
 
 	// get next waypoint
-	PathFinder::Path waypointPath = getTurnsToWaypoint();
+	Path waypointPath = getTurnsToWaypoint();
 	if (waypointPath.empty())
 	{
 		// safe failsave workaround
@@ -94,13 +92,9 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor);
 	move.setEnginePower(1);
-
-	bool isVeryCareful = self.getDurability() < 0.3 
-		|| waypointTileType == RIGHT_HEADED_T || waypointTileType == TOP_HEADED_T || waypointTileType == LEFT_HEADED_T || waypointTileType == BOTTOM_HEADED_T;
-
-	double corneringSpeed = isVeryCareful ? CORNERING_SPEED_CAREFUL : CORNERING_SPEED_REGULAR;
-	if (IsOilDanger())
-		corneringSpeed /= 2;
+	
+	bool isVeryCareful = false;
+	double corneringSpeed = calculateCorneringSpeed(self, waypointPath, waypointTileType, isVeryCareful);
 
 	int ticksToBrake = 0;
 	double distanceToBrake = 0;
@@ -171,6 +165,46 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	printFinishStats();
 }
 
+double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypointPath, TileType waypointTileType, bool& isVeryCareful) const
+{
+	isVeryCareful = self.getDurability() < 0.3
+		|| waypointTileType == RIGHT_HEADED_T || waypointTileType == TOP_HEADED_T || waypointTileType == LEFT_HEADED_T || waypointTileType == BOTTOM_HEADED_T;
+
+	static const int CORNERING_SPEED_CAREFUL = 7;
+	static const int CORNERING_SPEED_REGULAR = 10;
+
+	double corneringSpeed = isVeryCareful ? CORNERING_SPEED_CAREFUL : CORNERING_SPEED_REGULAR;
+	if (IsOilDanger())
+		corneringSpeed /= 2;
+
+
+	static const int SAFE_TURN_DISTANCE = 2;
+	static const int SAFEST_TURN_DISTANCE = 4;
+	
+	int futureTurnDistance = SAFE_TURN_DISTANCE; 
+	if (waypointPath.size() > 1)
+	{
+		const auto& thisTurn       = waypointPath.front();
+		const auto& futureWaypoint = *(++waypointPath.begin());
+
+		futureTurnDistance = futureWaypoint.m_turnAbsolute != AbsoluteDirection::UNKNOWN 
+			? static_cast<int>(thisTurn.m_pos.distanceTo(futureWaypoint.m_pos))
+			: SAFE_TURN_DISTANCE;
+	}
+
+	// TODO - improve this after zigzag improvement
+	// BUG (minor): issue with safest turn detection on 'default, map01, map02' maps
+
+	static const double FAST_SPEED_FACTOR    = 1.25;
+	static const double FASTEST_SPEED_FACTOR = 1.25;
+	if (futureTurnDistance >= SAFE_TURN_DISTANCE)
+		corneringSpeed *= FAST_SPEED_FACTOR;
+	if (futureTurnDistance >= SAFEST_TURN_DISTANCE) // not 'else if'
+		corneringSpeed *= FASTEST_SPEED_FACTOR;
+
+	return corneringSpeed;
+}
+
 void MyStrategy::shootEnemy(model::Move& move)
 {
 
@@ -220,7 +254,7 @@ void MyStrategy::shootEnemy(model::Move& move)
 			{
 				// don't shoot from jeep over walls and don't shoot oneself with ricochet
 				distance = std::max(m_game->getTrackTileSize(), distance);
-				PathFinder::Path pathToIntersection = m_pathFinder->getPath(selfPoint, intersection);
+				Path pathToIntersection = m_pathFinder->getPath(selfPoint, intersection);
 				shouldHit = (pathToIntersection.size() - 1) * m_game->getTrackTileSize() < 2/*disgonal*/ * distance + m_game->getTrackTileSize();
 			}
 
@@ -241,6 +275,8 @@ bool MyStrategy::IsOilDanger() const
 
 	int    ticksToOiledSpeed = 0;
 	double distanceToOiledSpeed = 0;
+
+	static const int CORNERING_SPEED_OILED = 5;
 	simulateBreaking(CORNERING_SPEED_OILED, ticksToOiledSpeed, distanceToOiledSpeed);
 
 	return m_world->getOilSlicks().cend() != std::find_if(m_world->getOilSlicks().cbegin(), m_world->getOilSlicks().cend(),
@@ -396,7 +432,7 @@ void MyStrategy::printFinishStats() const
 #endif
 }
 
-PathFinder::Path MyStrategy::getTurnsToWaypoint()
+Path MyStrategy::getTurnsToWaypoint()
 {
 	const auto& waypoints = m_world->getWaypoints();
 	int waypointIndex = m_self->getNextWaypointIndex();
@@ -441,8 +477,8 @@ PathFinder::Path MyStrategy::getTurnsToWaypoint()
 	size_t directionQuarter = std::find(std::begin(directionsByAngle), std::end(directionsByAngle), currentDirection) - std::begin(directionsByAngle);
 
 	// calculate turns
-	PathFinder::Path path        = m_pathFinder->getPath(current, waypoint);
-	PathFinder::Path furtherPath = m_pathFinder->getPath(waypoint, furtherWaypoint);
+	Path path        = m_pathFinder->getPath(current, waypoint);
+	Path furtherPath = m_pathFinder->getPath(waypoint, furtherWaypoint);
 	if (!furtherPath.empty())
 		furtherPath.pop_front(); // don't duplicate 1st waypoint tile
 	std::copy(std::begin(furtherPath), std::end(furtherPath), std::back_inserter(path));
@@ -460,7 +496,7 @@ PathFinder::Path MyStrategy::getTurnsToWaypoint()
 		it->m_turnAbsolute = turnTo;
 	}
 	
-	PathFinder::Path turns;
+	Path turns;
 	TilePathNode previous = path.front();
 	currentDirection = previous.m_turnAbsolute;
 

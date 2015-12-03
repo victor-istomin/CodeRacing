@@ -8,7 +8,7 @@
 #include <cmath>
 #include <vector>
 
-PathFinder::Path PathFinder::getPath(const PointD& from, const PointD& to)
+Path PathFinder::getPath(const PointD& from, const PointD& to)
 {
 	Map& map = m_map;
 	map.resetPathFinderCaches();

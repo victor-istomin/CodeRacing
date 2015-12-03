@@ -9,7 +9,6 @@ class PathFinder
 	Map& m_map;
 
 public:
-	typedef std::list<TilePathNode> Path;
 
 	explicit PathFinder(Map& map)
 		: m_map(map)

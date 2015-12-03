@@ -1,15 +1,24 @@
 #pragma once
-#include "model/Game.h"
-#include "model/World.h"
-#include <vector>
-#include <array>
-#include <cmath>
-
 #ifndef _DEBUG
 #  ifndef NDEBUG
 #    define NDEBUG
 #  endif
 #endif
+#ifndef PI
+#  define PI 3.14159265358979323846
+#endif
+#ifndef _USE_MATH_DEFINES
+#  define _USE_MATH_DEFINES
+#endif
+
+#include "model/Game.h"
+#include "model/World.h"
+#include <vector>
+#include <array>
+#include <cmath>
+#include <list>
+
+
 
 struct PointD
 {
@@ -97,3 +106,6 @@ struct TilePathNode
 
 	explicit TilePathNode(const TileNode& node);
 };
+
+typedef std::list<TilePathNode> Path;
+

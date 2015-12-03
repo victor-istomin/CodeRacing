@@ -53,7 +53,7 @@ public:
 		m_render.fillCircle(destination.x, destination.y, std::hypot(self.getWidth(), self.getHeight()) / 2, color);
 	}
 
-	void renderPath(Map& map, const PathFinder::Path& path)
+	void renderPath(Map& map, const Path& path)
 	{
 		std::unique_ptr<PointD> previous;
 
