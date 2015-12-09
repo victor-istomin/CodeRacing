@@ -396,7 +396,7 @@ bool MyStrategy::isWallCollision()
 		return false;
 
 	static const double STOPPED   = 7;
-	static const int    TICKS_GAP = 85;
+	static const int    TICKS_GAP = 90;
 	static const int    COLLIDE_INTERVAL = 160;
 	static const int    COOLDOWN_TICKS = 20;
 	static const double MIN_AVERAGE_SPEED = 1.5;
