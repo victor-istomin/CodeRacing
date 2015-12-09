@@ -12,6 +12,9 @@ public:
 	Vec2(T x, T y)		: m_x(x), m_y(y)         {}
 	Vec2(const Vec2& v) : m_x(v.m_x), m_y(v.m_y) {}
 
+	template <typename Point>
+	static Vec2 fromPoint(const Point& p) { return Vec2(p.x, p.y); }
+
 	Vec2& operator=(const Vec2& v)       { m_x = v.m_x; m_y = v.m_y; return *this; }
 	Vec2 operator+(Vec2& v)	const        { return Vec2(m_x + v.m_x, m_y + v.m_y); }
 	Vec2 operator-(Vec2& v) const        { return Vec2(m_x - v.m_x, m_y - v.m_y); }

@@ -73,6 +73,7 @@ enum class AbsoluteDirection
 	UP, DOWN,
 };
 
+template <typename Float> class Vec2;
 struct TileNode
 {
 	struct Transition
@@ -84,7 +85,7 @@ struct TileNode
 		Transition() : m_cachedParent(nullptr), m_turnedDirection(AbsoluteDirection::UNKNOWN), m_isZigzag(false) {}
 		Transition(TileNode& from, TileNode& to);
 
-		unsigned getCost(const TileNode& thisNode);
+		double getCost(const Vec2<double>& selfSpeed, const TileNode& thisNode);
 	};
 
 	model::TileType m_type;

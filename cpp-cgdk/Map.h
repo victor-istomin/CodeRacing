@@ -17,7 +17,8 @@ class Map
 	const int           m_worldHeightTiles;
 
 public:
-	static const unsigned NORMAL_TURN_COST = 1;
+	static const double NORMAL_TURN_COST;  // todo - check that this values used elsewhere instead of magic '1'!
+	static const double MIN_TURN_COST;
 
 	enum class Direction
 	{
@@ -62,20 +63,20 @@ public:
 	bool incrementTileNodeIndex(const TileNode& initial, Direction intcrementTo, PointI& result);
 	TileNode* getTileNodePtr(size_t index) { return &m_tileNodes[index]; }
 
-	double getCostFromStart(TileNode& node) const;
+	double getCostFromStart(const Vec2<double>& selfSpeed, TileNode& node) const;
 	double getHeuristicsTo(const TileNode& node, const TileNode& goal) const;
 
 	void resetPathFinderCaches(); // reset nodes parents, etc.
 
 	template <typename InitCallback>
-	void fillNeighbors(TileNode& node, InitCallback initNode) 
+	void fillNeighbors(const Vec2<double>& selfSpeed, TileNode& node, InitCallback initNode)
 	{
 		static const Direction directions[] = 
 		{ 
 			Direction::UP, Direction::DOWN, Direction::LEFT, Direction::RIGHT,
 		};
 
-		double parentCostFromStart = getCostFromStart(node);
+		double parentCostFromStart = getCostFromStart(selfSpeed, node);
 
 		for (Direction d : directions)
 		{

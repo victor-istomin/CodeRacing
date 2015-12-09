@@ -292,7 +292,7 @@ void MyStrategy::shootEnemy(model::Move& move)
 			{
 				// don't shoot from jeep over walls and don't shoot oneself with ricochet
 				distance = std::max(m_game->getTrackTileSize(), distance);
-				Path pathToIntersection = m_pathFinder->getPath(selfPoint, intersection);
+				Path pathToIntersection = m_pathFinder->getPath(Vec2d(/*don't care*/), selfPoint, intersection);
 				shouldHit = (pathToIntersection.size() - 1) * m_game->getTrackTileSize() < 2/*disgonal*/ * distance + m_game->getTrackTileSize();
 			}
 
@@ -517,8 +517,11 @@ Path MyStrategy::getTurnsToWaypoint()
 	// TODO - avoid unnecessary zigzag turns?
 
 	// calculate turns
-	Path path        = m_pathFinder->getPath(current, waypoint);
-	Path furtherPath = m_pathFinder->getPath(waypoint, furtherWaypoint);
+	Vec2d selfSpeed = Vec2d(m_self->getSpeedX(), m_self->getSpeedY());
+	Path  path      = m_pathFinder->getPath(selfSpeed, current, waypoint);
+
+	Vec2d furtherSpeed = path.size() > 3 ? Vec2d(/*don't care*/) : (selfSpeed / std::max(1U, path.size()));
+	Path  furtherPath  = m_pathFinder->getPath(furtherSpeed, waypoint, furtherWaypoint);
 	if (!furtherPath.empty())
 		furtherPath.pop_front(); // don't duplicate 1st waypoint tile
 	std::copy(std::begin(furtherPath), std::end(furtherPath), std::back_inserter(path));

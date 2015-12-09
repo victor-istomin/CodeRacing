@@ -6,6 +6,9 @@
 #include <map>
 #include <algorithm>
 
+const double Map::NORMAL_TURN_COST = 2;
+const double Map::MIN_TURN_COST    = 1;
+
 Map::Map(const model::Game& game, const model::World& world)
 	: m_tiles(world.getTilesXY())
 	, m_game(&game)
@@ -197,14 +200,14 @@ bool Map::incrementTileNodeIndex(const TileNode& initial, Direction incrementTo,
 		&& incremented.x >= 0 && incremented.x < m_worldWidthTiles && incremented.y >= 0 && incremented.y < m_worldHeightTiles;
 }
 
-double Map::getCostFromStart(TileNode& node) const
+double Map::getCostFromStart(const Vec2d& selfSpeed, TileNode& node) const
 {
-	unsigned cost = 0;
+	double cost = 0;
 	TileNode* parent = node.m_transition.m_cachedParent;
 
 	while (parent != nullptr)
 	{
-		cost += parent->m_transition.getCost(node);
+		cost += parent->m_transition.getCost(selfSpeed, node);
 		parent = parent->m_transition.m_cachedParent;
 	}
 
@@ -214,7 +217,7 @@ double Map::getCostFromStart(TileNode& node) const
 double Map::getHeuristicsTo(const TileNode& node, const TileNode& goal) const
 {
 	PointI diff = node.m_pos - goal.m_pos;
-	return std::hypot(diff.x, diff.y); // TODO - cars, obstacles, angle, etc.
+	return std::hypot(diff.x, diff.y) * Map::MIN_TURN_COST; // TODO - cars, obstacles, angle, etc.
 }
 
 void Map::resetPathFinderCaches()
@@ -242,14 +245,14 @@ TileNode::Transition::Transition(TileNode& from, TileNode& to)
 	assert(m_turnedDirection != AbsoluteDirection::UNKNOWN);
 }
 
-unsigned TileNode::Transition::getCost(const TileNode& thisNode)
+double TileNode::Transition::getCost(const Vec2d& selfSpeed, const TileNode& thisNode)
 {
-	static const unsigned TURN_PENALTY                  = Map::NORMAL_TURN_COST;
-	static const unsigned TURN_180_PENALTY              = 4 * Map::NORMAL_TURN_COST;
-	static const unsigned WAYPOINT_OUT_OF_ORDER_PENALTY = Map::NORMAL_TURN_COST;      // it's not so good to go through incorrect waypoint
-	static const unsigned ZIGZAZ_TURN_PRIZE             = Map::NORMAL_TURN_COST / 2;  // zigzag turn is better then usual turn
+	static const double TURN_PENALTY                  = Map::NORMAL_TURN_COST;
+	static const double TURN_180_PENALTY              = 4 * Map::NORMAL_TURN_COST;
+	static const double WAYPOINT_OUT_OF_ORDER_PENALTY = Map::NORMAL_TURN_COST; // TODO - increase?     // it's not so good to go through incorrect waypoint
+	static const double ZIGZAZ_TURN_PRIZE             = -Map::NORMAL_TURN_COST / 1.5;  // zigzag turn is slightly better then usual turn
 
-	unsigned cost = Map::NORMAL_TURN_COST;
+	double cost = Map::NORMAL_TURN_COST;
 
 	AbsoluteDirection previousTurn = m_cachedParent == nullptr ? m_turnedDirection/*assume no change*/ : m_cachedParent->m_transition.m_turnedDirection;
 	if (m_turnedDirection != previousTurn)
@@ -264,14 +267,6 @@ unsigned TileNode::Transition::getCost(const TileNode& thisNode)
 		cost += TURN_180_PENALTY;
 	}
 
-	/*static const std::pair<TurnDirection, TurnDirection> directions180[] = 
-	{
-		{TurnDirection::LEFT,  TurnDirection::RIGHT},
-		{TurnDirection::RIGHT, TurnDirection::LEFT},
-		{TurnDirection::DOWN,  TurnDirection::UP},
-		{TurnDirection::UP,    TurnDirection::DOWN}
-	};*/
-
 	TileNode* prePrevious = m_cachedParent != nullptr ? m_cachedParent->m_transition.m_cachedParent : nullptr;
 	bool isZigzag = m_isZigzag // already calculated
 		|| ( prePrevious != nullptr
@@ -280,7 +275,7 @@ unsigned TileNode::Transition::getCost(const TileNode& thisNode)
 
 	if (isZigzag)
 	{
-		cost -= ZIGZAZ_TURN_PRIZE;
+		cost += ZIGZAZ_TURN_PRIZE;
 	}
 
 	m_isZigzag = isZigzag;
@@ -289,6 +284,31 @@ unsigned TileNode::Transition::getCost(const TileNode& thisNode)
 
 	if (thisNode.m_isWaypoint)
 		cost += WAYPOINT_OUT_OF_ORDER_PENALTY;
+
+	// speed vector may become a bonus or penalty for transitions near start
+	if (m_cachedParent != nullptr)
+	{
+		int tilesFromStart = 0;
+		TileNode* previousNode = m_cachedParent;
+		Vec2d correctedSpeed = selfSpeed;
+		while (previousNode != nullptr)
+		{
+			correctedSpeed /= 2;  // further from start -> less penalty
+			++tilesFromStart;
+			previousNode = previousNode->m_transition.m_cachedParent;
+		}
+
+		// todo - use tilesFromStart?
+		Vec2d turnVector = Vec2d::fromPoint(thisNode.m_pos - m_cachedParent->m_pos);
+		double directionPrize = Vec2d::dot(correctedSpeed, turnVector) / selfSpeed.length(); // [-1; +1]
+
+		static const double SPEED_VECTOR_PENALTY = Map::NORMAL_TURN_COST * 8; // almost no penalty after log2(8) = 3 tiles
+		static const double SPEED_VECTOR_PRIZE   = -Map::NORMAL_TURN_COST;
+
+		double costIncrement = directionPrize > 0 ? directionPrize * SPEED_VECTOR_PRIZE : directionPrize * SPEED_VECTOR_PENALTY;
+		double newCost = cost + costIncrement;
+		cost = std::max(newCost, Map::MIN_TURN_COST);
+	}
 
 	return cost;		
 }

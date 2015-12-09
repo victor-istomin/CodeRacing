@@ -1,6 +1,7 @@
 #pragma once
 #include "Utils.h"
 #include "Map.h"
+#include "Vec2.h"
 
 #include <list>
 
@@ -15,6 +16,6 @@ public:
 	{
 	}
 
-	Path getPath(const PointD& from, const PointD& to);
+	Path getPath(const Vec2d& selfSpeed, const PointD& from, const PointD& to);
 
 };
