@@ -574,7 +574,13 @@ Path MyStrategy::getTurnsToWaypoint()
 
 PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 {
-	static const double FAR_DISTANCE = m_game->getTrackTileSize() * 1.7;
+	// radius of circle around a*a square is a*sqr(2). For a = 1 it's 1.4
+	//static const double FAR_DISTANCE      = m_game->getTrackTileSize() * 1.4;
+	//static const double VERY_FAR_DISTANCE = m_game->getTrackTileSize() * 2;
+	static const double MIN_ENTRY_FACTOR = 1.5;
+	static const double MAX_ENTRY_FACTOR = 3;
+	static const double TILE_SIZE = m_game->getTrackTileSize();
+	static const double ENTRY_DISTANCE = MIN_ENTRY_FACTOR * TILE_SIZE;
 
 	int x = turn.m_pos.x;
 	int y = turn.m_pos.y;
@@ -583,7 +589,10 @@ PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 	PointI selfTileIndex   = m_map->getTileIndex(PointD(m_self->getX(), m_self->getY()));
 	bool isHorizontalEnrty = selfTileIndex.y == y;
 	bool isVerticalEntry   = selfTileIndex.x == x;
-	bool isFarFrom = m_self->getDistanceTo(turnCenter.x, turnCenter.y) > FAR_DISTANCE;
+
+	double distanceToTurn = m_self->getDistanceTo(turnCenter.x, turnCenter.y);
+
+	bool isFarFrom = distanceToTurn > ENTRY_DISTANCE;
 
 	if (!isVerticalEntry && !isHorizontalEnrty)
 	{
@@ -592,7 +601,18 @@ PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 	}
 
 	PointD entry = m_map->getTurnOuterCorner(x, y, turn);
-	double towardsDisplacement = isFarFrom ? m_game->getTrackTileSize() * 1.3 : m_game->getTrackTileSize() / 2;
+	double towardsDisplacement = TILE_SIZE / 2;
+	if (isFarFrom)
+	{
+		// TODO check this code - it should guide car to outer radius of turn between 3 and 1.5 tiles to turn
+		double tilesToEntry = distanceToTurn / TILE_SIZE;
+		double gap = std::hypot(m_self->getWidth(), m_self->getHeight()) / 1.5 / TILE_SIZE;
+		double multiplier = std::min(MAX_ENTRY_FACTOR, tilesToEntry) - gap;
+
+		towardsDisplacement = multiplier * TILE_SIZE;
+	}
+
+	// TODO - add speed correction?
 
 	if (isHorizontalEnrty)
 	{
