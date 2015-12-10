@@ -63,20 +63,20 @@ public:
 	bool incrementTileNodeIndex(const TileNode& initial, Direction intcrementTo, PointI& result);
 	TileNode* getTileNodePtr(size_t index) { return &m_tileNodes[index]; }
 
-	double getCostFromStart(const Vec2<double>& selfSpeed, TileNode& node) const;
+	double getCostFromStart(TileNode& node) const;
 	double getHeuristicsTo(const TileNode& node, const TileNode& goal) const;
 
 	void resetPathFinderCaches(); // reset nodes parents, etc.
 
 	template <typename InitCallback>
-	void fillNeighbors(const Vec2<double>& selfSpeed, TileNode& node, InitCallback initNode)
+	void fillNeighbors(TileNode& node, InitCallback initNode)
 	{
 		static const Direction directions[] = 
 		{ 
 			Direction::UP, Direction::DOWN, Direction::LEFT, Direction::RIGHT,
 		};
 
-		double parentCostFromStart = getCostFromStart(selfSpeed, node);
+		double parentCostFromStart = getCostFromStart(node);
 
 		for (Direction d : directions)
 		{

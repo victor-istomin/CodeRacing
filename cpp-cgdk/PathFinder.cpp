@@ -53,7 +53,7 @@ Path PathFinder::getPath(const Vec2d& selfSpeed, const PointD& from, const Point
 
 		// add neighbors to open list
 
-		map.fillNeighbors(selfSpeed, *currentNode, 
+		map.fillNeighbors(*currentNode, 
 			[&map, &currentNode, &finish, &openSet, &openSetHash, &closedSet, selfSpeed](TileNode* candidate, double currentGx)
 		{
 			if (candidate == currentNode || candidate == currentNode->m_transition.m_cachedParent)
@@ -61,9 +61,10 @@ Path PathFinder::getPath(const Vec2d& selfSpeed, const PointD& from, const Point
 
 			assert(candidate->m_type != model::EMPTY);
 
-			TileNode::Transition newTransition = TileNode::Transition(*currentNode, *candidate);
+			TileNode::Transition newTransition = TileNode::Transition(*currentNode, *candidate);			
 
-			double newTransitionCost = newTransition.getCost(selfSpeed, *candidate);  // ... and calculate zigzag move
+			double newTransitionCost = newTransition.getCost(selfSpeed, *candidate);  // ... and calculate zigzag move. TODO - zigzag have to
+			                                                                          // be moved after loop checks!
 			double newGx = currentGx + newTransitionCost;
 			double heuristics = map.getHeuristicsTo(*candidate, *finish); // TODO - can change or can not? This matters in closed node improvement
 			double newFx = newGx + heuristics;
@@ -71,7 +72,7 @@ Path PathFinder::getPath(const Vec2d& selfSpeed, const PointD& from, const Point
 			bool isAlreadyOpened = openSetHash.find(candidate) != openSetHash.end();
 			bool isAlreadyClosed = closedSet.find(candidate)   != closedSet.end();
 			bool isAlreadySeen = isAlreadyOpened || isAlreadyClosed;
-			double candidateOldGx = map.getCostFromStart(selfSpeed,*candidate);
+			double candidateOldGx = map.getCostFromStart(*candidate);
 
 			if (isAlreadySeen && candidateOldGx <= newGx)
 			{
@@ -98,7 +99,7 @@ Path PathFinder::getPath(const Vec2d& selfSpeed, const PointD& from, const Point
 			}
 
 			// update stats only if new path through close node is shorter
-
+			newTransition.m_cachedTransitionCost = newTransitionCost;
 			candidate->m_transition = newTransition;
 			openSet.insert( std::make_pair(newFx, candidate) );
 			openSetHash.insert(candidate);

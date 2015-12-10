@@ -200,14 +200,14 @@ bool Map::incrementTileNodeIndex(const TileNode& initial, Direction incrementTo,
 		&& incremented.x >= 0 && incremented.x < m_worldWidthTiles && incremented.y >= 0 && incremented.y < m_worldHeightTiles;
 }
 
-double Map::getCostFromStart(const Vec2d& selfSpeed, TileNode& node) const
+double Map::getCostFromStart(TileNode& node) const
 {
 	double cost = 0;
-	TileNode* parent = node.m_transition.m_cachedParent;
+	TileNode* parent = &node;// .m_transition.m_cachedParent;
 
 	while (parent != nullptr)
 	{
-		cost += parent->m_transition.getCost(selfSpeed, node);
+		cost += parent->m_transition.m_cachedTransitionCost;
 		parent = parent->m_transition.m_cachedParent;
 	}
 
@@ -232,6 +232,7 @@ TileNode::Transition::Transition(TileNode& from, TileNode& to)
 	: m_cachedParent(&from)
 	, m_turnedDirection(AbsoluteDirection::UNKNOWN)
 	, m_isZigzag(false)
+	, m_cachedTransitionCost(0)
 {
 	if (from.m_pos.x > to.m_pos.x)
 		m_turnedDirection = AbsoluteDirection::LEFT;
@@ -286,24 +287,38 @@ double TileNode::Transition::getCost(const Vec2d& selfSpeed, const TileNode& thi
 		cost += WAYPOINT_OUT_OF_ORDER_PENALTY;
 
 	// speed vector may become a bonus or penalty for transitions near start
-	if (m_cachedParent != nullptr)
+	bool isMoving = selfSpeed.m_x != 0 || selfSpeed.m_y != 0;
+	if (m_cachedParent != nullptr && isMoving)
 	{
 		int tilesFromStart = 0;
-		TileNode* previousNode = m_cachedParent;
 		Vec2d correctedSpeed = selfSpeed;
+		TileNode* previousNode = m_cachedParent->m_transition.m_cachedParent;
 		while (previousNode != nullptr)
 		{
 			correctedSpeed /= 2;  // further from start -> less penalty
-			++tilesFromStart;
 			previousNode = previousNode->m_transition.m_cachedParent;
+
+			if (++tilesFromStart > 2)
+			{
+				// too far, no sense to calculate
+				correctedSpeed = Vec2d(0, 0);
+				break;
+			}
 		}
+
+		// remove "noise"
+		if (std::abs(correctedSpeed.m_x) < 1)
+			correctedSpeed.m_x = 0;
+		if (std::abs(correctedSpeed.m_y) < 1)
+			correctedSpeed.m_y = 0;
 
 		// todo - use tilesFromStart?
 		Vec2d turnVector = Vec2d::fromPoint(thisNode.m_pos - m_cachedParent->m_pos);
 		double directionPrize = Vec2d::dot(correctedSpeed, turnVector) / selfSpeed.length(); // [-1; +1]
 
-		static const double SPEED_VECTOR_PENALTY = Map::NORMAL_TURN_COST * 8; // almost no penalty after log2(8) = 3 tiles
-		static const double SPEED_VECTOR_PRIZE   = -Map::NORMAL_TURN_COST;
+		// almost no penalty after log2(8) = 3 tiles
+		static const double SPEED_VECTOR_PENALTY = -Map::NORMAL_TURN_COST * 16;  // negative prize * negative penalty = positive cost incerment
+		static const double SPEED_VECTOR_PRIZE   = -Map::NORMAL_TURN_COST * 2;   // positive prize * negative penalty = negative cost increment
 
 		double costIncrement = directionPrize > 0 ? directionPrize * SPEED_VECTOR_PRIZE : directionPrize * SPEED_VECTOR_PENALTY;
 		double newCost = cost + costIncrement;

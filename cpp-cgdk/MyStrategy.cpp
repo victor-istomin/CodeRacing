@@ -590,7 +590,7 @@ PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 
 	if (!isVerticalEntry && !isHorizontalEnrty)
 	{
-		assert(isVerticalEntry || isHorizontalEnrty); // something went wrong
+		//assert(isVerticalEntry || isHorizontalEnrty); // something went wrong
 		return turnCenter;
 	}
 
