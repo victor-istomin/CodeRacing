@@ -48,13 +48,17 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 
 	assert(!waypointPath.empty());
-	bool isPassThruWaypoint =  waypointPath.front().m_turnRelative == RelativeTurn::TURN_NONE;
+	Path::const_reference turnTile = waypointPath.front();
+	bool isPassThruWaypoint = turnTile.m_turnRelative == RelativeTurn::TURN_NONE;
 	TileType turnTileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
 
-	PointD nextWaypoint = getTurnEntryPoint(waypointPath.front());
+	PointD nextWaypoint = getTurnEntryPoint(turnTile);
+	PointD nextTurnCenter = m_map->getTileCenter(turnTile.m_pos.x, turnTile.m_pos.y);
 	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+	double distanceToTurn = self.getDistanceTo(nextTurnCenter.x, nextTurnCenter.y);
 	debug.m_destination = nextWaypoint;
+	debug.m_turn = nextTurnCenter;
 
 	if (isWallCollision())
 	{
@@ -98,16 +102,16 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	double distanceToBrake = 0;
 	simulateBreaking(corneringSpeed, ticksToBrake, distanceToBrake);
 	
-	// brake before waypoint
+	// brake before turn, not before waypoint
 	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / (isVeryCareful ? 4 : 5);
-	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > corneringSpeed && !isPassThruWaypoint)
+	if (distanceWithGap > distanceToTurn && m_statistics.m_currentSpeed > corneringSpeed && !isPassThruWaypoint)
 	{
 		move.setBrake(true);
 		move.setUseNitro(false);
 	}
 
 	// it's good idea to spill oil before apex 
-	bool isJustBeforeTurn = !isPassThruWaypoint && distanceToWaypoint < game.getTrackTileSize() / 2;
+	bool isJustBeforeTurn = !isPassThruWaypoint && distanceToTurn < game.getTrackTileSize() / 2;
 	if (self.getOilCanisterCount() > 0 && isJustBeforeTurn)
 	{
 		const int OIL_SPILL_DELAY = 300;
@@ -220,7 +224,7 @@ double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypoint
 	// BUG (minor): issue with safest turn detection on 'default, map01, map02' maps
 
 	static const double FAST_SPEED_FACTOR    = 1.25;
-	static const double FASTEST_SPEED_FACTOR = 1.15;
+	static const double FASTEST_SPEED_FACTOR = 1.25;
 	static const double NO_TURN_FACTOR       = 3;
 
 	if (futureTurnDistance >= SAFE_TURN_DISTANCE)

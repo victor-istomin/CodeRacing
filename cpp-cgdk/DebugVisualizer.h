@@ -40,7 +40,7 @@ public:
 		}
 	}
 
-	void renderMoveTarget(const model::Car& self, const model::Move& move, const PointD& destination)
+	void renderMoveTarget(const model::Car& self, const model::Move& move, const PointD& destination, const PointD& turnCenter)
 	{
 		int32_t color = 0x8888BB;
 
@@ -51,6 +51,7 @@ public:
 
 		m_render.line(self.getX(), self.getY(), destination.x, destination.y, color);
 		m_render.fillCircle(destination.x, destination.y, std::hypot(self.getWidth(), self.getHeight()) / 2, color);
+		m_render.circle(turnCenter.x, turnCenter.y, std::hypot(self.getWidth(), self.getHeight()) / 4, 0x555555);
 	}
 
 	void renderPath(Map& map, const Path& path)
