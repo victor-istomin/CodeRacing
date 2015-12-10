@@ -73,18 +73,20 @@ enum class AbsoluteDirection
 	UP, DOWN,
 };
 
+template <typename Float> class Vec2;
 struct TileNode
 {
 	struct Transition
 	{
 		TileNode*         m_cachedParent;
+		double            m_cachedTransitionCost;
 		AbsoluteDirection m_turnedDirection;   // which turn performed to move 'parent' -> 'this'
 		bool              m_isZigzag;
 
-		Transition() : m_cachedParent(nullptr), m_turnedDirection(AbsoluteDirection::UNKNOWN), m_isZigzag(false) {}
+		Transition() : m_cachedParent(nullptr), m_turnedDirection(AbsoluteDirection::UNKNOWN), m_isZigzag(false), m_cachedTransitionCost(0) {}
 		Transition(TileNode& from, TileNode& to);
 
-		unsigned getCost(const TileNode& thisNode);
+		double getCost(const Vec2<double>& selfSpeed, const TileNode& thisNode);
 	};
 
 	model::TileType m_type;

@@ -8,7 +8,7 @@
 #include <cmath>
 #include <vector>
 
-Path PathFinder::getPath(const PointD& from, const PointD& to)
+Path PathFinder::getPath(const Vec2d& selfSpeed, const PointD& from, const PointD& to)
 {
 	Map& map = m_map;
 	map.resetPathFinderCaches();
@@ -54,16 +54,17 @@ Path PathFinder::getPath(const PointD& from, const PointD& to)
 		// add neighbors to open list
 
 		map.fillNeighbors(*currentNode, 
-			[&map, &currentNode, &finish, &openSet, &openSetHash, &closedSet](TileNode* candidate, double currentGx)
+			[&map, &currentNode, &finish, &openSet, &openSetHash, &closedSet, selfSpeed](TileNode* candidate, double currentGx)
 		{
 			if (candidate == currentNode || candidate == currentNode->m_transition.m_cachedParent)
 				return;
 
 			assert(candidate->m_type != model::EMPTY);
 
-			TileNode::Transition newTransition = TileNode::Transition(*currentNode, *candidate);
+			TileNode::Transition newTransition = TileNode::Transition(*currentNode, *candidate);			
 
-			double newTransitionCost = newTransition.getCost(*candidate);  // ... and calculate zigzag move
+			double newTransitionCost = newTransition.getCost(selfSpeed, *candidate);  // ... and calculate zigzag move. TODO - zigzag have to
+			                                                                          // be moved after loop checks!
 			double newGx = currentGx + newTransitionCost;
 			double heuristics = map.getHeuristicsTo(*candidate, *finish); // TODO - can change or can not? This matters in closed node improvement
 			double newFx = newGx + heuristics;
@@ -98,7 +99,7 @@ Path PathFinder::getPath(const PointD& from, const PointD& to)
 			}
 
 			// update stats only if new path through close node is shorter
-
+			newTransition.m_cachedTransitionCost = newTransitionCost;
 			candidate->m_transition = newTransition;
 			openSet.insert( std::make_pair(newFx, candidate) );
 			openSetHash.insert(candidate);

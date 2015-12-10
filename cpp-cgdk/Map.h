@@ -17,7 +17,8 @@ class Map
 	const int           m_worldHeightTiles;
 
 public:
-	static const unsigned NORMAL_TURN_COST = 1;
+	static const double NORMAL_TURN_COST;  // todo - check that this values used elsewhere instead of magic '1'!
+	static const double MIN_TURN_COST;
 
 	enum class Direction
 	{
@@ -68,7 +69,7 @@ public:
 	void resetPathFinderCaches(); // reset nodes parents, etc.
 
 	template <typename InitCallback>
-	void fillNeighbors(TileNode& node, InitCallback initNode) 
+	void fillNeighbors(TileNode& node, InitCallback initNode)
 	{
 		static const Direction directions[] = 
 		{ 
