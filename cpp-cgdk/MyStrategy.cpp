@@ -136,22 +136,54 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	// may correct angle to pick up some interesting
 	if (isMovingForward() && correctedDistanceToWaypoint > game.getTrackTileSize() * 2)
 	{
-		auto bonus = std::find_if(world.getBonuses().cbegin(), world.getBonuses().cend(), 
-			[&self, &game, &nextWaypoint, distanceToWaypoint, angleToWaypoint](const Bonus& bonus)
+		const double TILE_SIZE = m_game->getTrackTileSize();
+		const double NEAR_THRESHOLD = 2 * TILE_SIZE;
+		const double CLOSE_THRESHOLD = TILE_SIZE;
+
+		unsigned finishedCars = 0;
+		bool     isNearOpponent = false;
+		bool     isCloseOppenent = false;
+		for (const auto& car : m_world->getCars())
 		{
-			double searchScope = 3 * PI / 180;
+			if (car.isFinishedTrack())
+			{
+				++finishedCars;
+				continue;
+			}
+
+			double distanceToCar = m_self->getDistanceTo(car);
+			if (distanceToCar < NEAR_THRESHOLD)
+				isNearOpponent = true;
+
+			if (distanceToCar < CLOSE_THRESHOLD)
+				isCloseOppenent = true;
+		}
+
+		auto bonus = std::find_if(world.getBonuses().cbegin(), world.getBonuses().cend(), 
+			[&self, &game, &nextWaypoint, distanceToWaypoint, angleToWaypoint, finishedCars, isNearOpponent, isCloseOppenent](const Bonus& bonus)
+		{
+			double searchScope = 5 * PI / 180;
 			double health = self.getDurability();
 			double relativeDist = distanceToWaypoint - self.getDistanceTo(bonus);
 
 			switch (bonus.getType())
 			{
-			case NITRO_BOOST:
 			case OIL_CANISTER:
-				searchScope *= 2;
+				break;
+
+			case PURE_SCORE:
+				searchScope *= finishedCars == 3 ? 3 : 1;   // collect as much as possible if already looser
+				if (!isNearOpponent)
+					searchScope *= 1.5;
+				if (isCloseOppenent)
+					searchScope /= 1.5;
+
+			case NITRO_BOOST:
+				searchScope *= 2 / static_cast<double>(self.getNitroChargeCount() + 1);
 				break;
 
 			case REPAIR_KIT:
-				searchScope *= (health > 0 && health < 0.9) ? std::min(3.0, 1 / health) : 0.5;
+				searchScope *= (health > 0 && health < 0.9) ? std::min(2.0, 1 / health) : 0.3;
 				relativeDist *= (health > 0 && health < 0.5) ? std::min(2.0, 1 / (health + 0.5)) : 1;
 				break;
 
