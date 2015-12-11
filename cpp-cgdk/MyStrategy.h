@@ -133,6 +133,8 @@ private:
 
 	Path getTurnsToWaypoint();
 	PointD getTurnEntryPoint(const TilePathNode& turn) const;
+
+	static double getAngleBetween(const PointD& src, double srcAngle, const PointD& target);
 };
 
 #endif

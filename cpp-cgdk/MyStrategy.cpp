@@ -54,12 +54,22 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	PointD nextWaypoint = getTurnEntryPoint(turnTile);
 	PointD nextTurnCenter = m_map->getTileCenter(turnTile.m_pos.x, turnTile.m_pos.y);
-	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
 	double distanceToTurn = self.getDistanceTo(nextTurnCenter.x, nextTurnCenter.y);
 	debug.m_destination = nextWaypoint;
 	debug.m_turn = nextTurnCenter;
 
+	// try angle prediction
+	Vec2d  selfSpeed   = Vec2d(self.getSpeedX(), self.getSpeedY());
+	Vec2d  futureSpeed = selfSpeed * 3; // todo
+	double maxPredictionLen = distanceToWaypoint * 0.8;
+	if (futureSpeed.length() > maxPredictionLen)
+		futureSpeed /= futureSpeed.length() / maxPredictionLen;
+
+	PointD futureSelf  = PointD(self) + PointD(futureSpeed.m_x, futureSpeed.m_y);
+	double futureAngle = self.getAngle() + self.getAngularSpeed();
+	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
+	
 	if (isWallCollision())
 	{
 		move.setEnginePower(-1);
@@ -70,7 +80,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	// apply brake when changing rear/front gear
 	bool wantsForward = self.getEnginePower() >= 0 || move.getEnginePower() > 0;
-	bool isStopped = self.getSpeedX() == 0 && self.getSpeedY() == 0;
+	bool isStopped = selfSpeed.length() < 0.001;
 	if (!isStopped && (isMovingForward() != wantsForward))
 	{
 		move.setBrake(true);
@@ -625,6 +635,20 @@ PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 	}
 
 	return entry;
+}
+
+double MyStrategy::getAngleBetween(const PointD& src, double srcAngle, const PointD& target)
+{
+	double absoluteAngleTo = atan2(target.y - src.y, target.x - src.x);
+	double relativeAngleTo = absoluteAngleTo - srcAngle;
+
+	while (relativeAngleTo > PI)
+		relativeAngleTo -= 2.0 * PI;
+
+	while (relativeAngleTo < -PI)
+		relativeAngleTo += 2.0 * PI;
+
+	return relativeAngleTo;
 }
 
 MyStrategy::Statistics::Statistics()
