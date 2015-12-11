@@ -166,6 +166,8 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 			double health = self.getDurability();
 			double relativeDist = distanceToWaypoint - self.getDistanceTo(bonus);
 
+			todo - do not go to bonus through walls!
+
 			switch (bonus.getType())
 			{
 			case OIL_CANISTER:
