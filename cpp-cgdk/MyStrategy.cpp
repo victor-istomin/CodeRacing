@@ -121,7 +121,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	}
 
 	// it's good idea to spill oil before apex 
-	bool isJustBeforeTurn = !isPassThruWaypoint && distanceToTurn < game.getTrackTileSize() / 2;
+	bool isJustBeforeTurn = !isPassThruWaypoint && distanceToTurn < game.getTrackTileSize();
 	if (self.getOilCanisterCount() > 0 && isJustBeforeTurn)
 	{
 		const int OIL_SPILL_DELAY = 300;
