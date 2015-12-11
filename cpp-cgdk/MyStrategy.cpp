@@ -46,18 +46,30 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 		node.m_turnRelative = RelativeTurn::TURN_CLOCKWISE;
 	}
 
-	PointD nextWaypoint = getTurnEntryPoint(waypointPath.front());
 
+	assert(!waypointPath.empty());
+	Path::const_reference turnTile = waypointPath.front();
+	bool isPassThruWaypoint = turnTile.m_turnRelative == RelativeTurn::TURN_NONE;
+	TileType turnTileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
+
+	PointD nextWaypoint = getTurnEntryPoint(turnTile);
+	PointD nextTurnCenter = m_map->getTileCenter(turnTile.m_pos.x, turnTile.m_pos.y);
 	double distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
-
-	bool isPassThruWaypoint = waypointPath.empty() ? false : waypointPath.front().m_turnRelative == RelativeTurn::TURN_NONE;
-
-	TileType waypointTileType = m_map->getTileType(self.getNextWaypointX(), self.getNextWaypointY());
-
-	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
-	distanceToWaypoint = self.getDistanceTo(nextWaypoint.x, nextWaypoint.y);
+	double distanceToTurn = self.getDistanceTo(nextTurnCenter.x, nextTurnCenter.y);
 	debug.m_destination = nextWaypoint;
+	debug.m_turn = nextTurnCenter;
 
+	// try angle prediction
+	Vec2d  selfSpeed   = Vec2d(self.getSpeedX(), self.getSpeedY());
+	Vec2d  futureSpeed = selfSpeed * 3; // todo
+	double maxPredictionLen = distanceToWaypoint * 0.8;
+	if (futureSpeed.length() > maxPredictionLen)
+		futureSpeed /= futureSpeed.length() / maxPredictionLen;
+
+	PointD futureSelf  = PointD(self) + PointD(futureSpeed.m_x, futureSpeed.m_y);
+	double futureAngle = self.getAngle() + self.getAngularSpeed();
+	double angleToWaypoint = self.getAngleTo(nextWaypoint.x, nextWaypoint.y);
+	
 	if (isWallCollision())
 	{
 		move.setEnginePower(-1);
@@ -68,7 +80,7 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	// apply brake when changing rear/front gear
 	bool wantsForward = self.getEnginePower() >= 0 || move.getEnginePower() > 0;
-	bool isStopped = self.getSpeedX() == 0 && self.getSpeedY() == 0;
+	bool isStopped = selfSpeed.length() < 0.001;
 	if (!isStopped && (isMovingForward() != wantsForward))
 	{
 		move.setBrake(true);
@@ -78,10 +90,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	double correctedDistanceToWaypoint = (isPassThruWaypoint ? 1.5 : 1.0) * distanceToWaypoint;   // TODO - fixme
 	if (world.getTick() > game.getInitialFreezeDurationTicks() 
 		&& degreesToWaypoint < 10.0 && correctedDistanceToWaypoint > 3 * game.getTrackTileSize()
-		&& waypointTileType != TOP_HEADED_T
-		&& waypointTileType != RIGHT_HEADED_T
-	    && waypointTileType != LEFT_HEADED_T  
-		&& waypointTileType != BOTTOM_HEADED_T
+		&& turnTileType != TOP_HEADED_T
+		&& turnTileType != RIGHT_HEADED_T
+	    && turnTileType != LEFT_HEADED_T  
+		&& turnTileType != BOTTOM_HEADED_T
 	   )
 	{
 		move.setUseNitro(true);
@@ -89,27 +101,27 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 
 	
 	// move
-	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* read gear*/;
+	double turnDirection = isMovingForward() ? 1 /* front gear*/ : -1.5 /* rear gear*/;
 	move.setWheelTurn(turnDirection * angleToWaypoint * k_angleFactor);
 	move.setEnginePower(1);
 	
 	bool isVeryCareful = false;
-	double corneringSpeed = calculateCorneringSpeed(self, waypointPath, waypointTileType, isVeryCareful);
+	double corneringSpeed = calculateCorneringSpeed(self, waypointPath, turnTileType, isVeryCareful);
 
 	int ticksToBrake = 0;
 	double distanceToBrake = 0;
 	simulateBreaking(corneringSpeed, ticksToBrake, distanceToBrake);
 	
-	// brake before waypoint
+	// brake before turn, not before waypoint
 	double distanceWithGap = distanceToBrake + game.getTrackTileSize() / (isVeryCareful ? 4 : 5);
-	if (distanceWithGap > distanceToWaypoint && m_statistics.m_currentSpeed > corneringSpeed && !isPassThruWaypoint)
+	if (distanceWithGap > distanceToTurn && m_statistics.m_currentSpeed > corneringSpeed && !isPassThruWaypoint)
 	{
 		move.setBrake(true);
 		move.setUseNitro(false);
 	}
 
 	// it's good idea to spill oil before apex 
-	bool isJustBeforeTurn = !isPassThruWaypoint && distanceToWaypoint < game.getTrackTileSize() / 2;
+	bool isJustBeforeTurn = !isPassThruWaypoint && distanceToTurn < game.getTrackTileSize() / 2;
 	if (self.getOilCanisterCount() > 0 && isJustBeforeTurn)
 	{
 		const int OIL_SPILL_DELAY = 300;
@@ -165,10 +177,10 @@ void MyStrategy::move(const Car& self, const World& world, const Game& game, Mov
 	printFinishStats();
 }
 
-double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypointPath, TileType waypointTileType, bool& isVeryCareful) const
+double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypointPath, TileType turnTileType, bool& isVeryCareful) const
 {
 	isVeryCareful = self.getDurability() < 0.3
-		|| waypointTileType == RIGHT_HEADED_T || waypointTileType == TOP_HEADED_T || waypointTileType == LEFT_HEADED_T || waypointTileType == BOTTOM_HEADED_T;
+		|| turnTileType == RIGHT_HEADED_T || turnTileType == TOP_HEADED_T || turnTileType == LEFT_HEADED_T || turnTileType == BOTTOM_HEADED_T;
 
 	static const int CORNERING_SPEED_CAREFUL = 7;
 	static const int CORNERING_SPEED_REGULAR = 10;
@@ -222,7 +234,7 @@ double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypoint
 	// BUG (minor): issue with safest turn detection on 'default, map01, map02' maps
 
 	static const double FAST_SPEED_FACTOR    = 1.25;
-	static const double FASTEST_SPEED_FACTOR = 1.15;
+	static const double FASTEST_SPEED_FACTOR = 1.25;
 	static const double NO_TURN_FACTOR       = 3;
 
 	if (futureTurnDistance >= SAFE_TURN_DISTANCE)
@@ -237,7 +249,6 @@ double MyStrategy::calculateCorneringSpeed(const Car &self, const Path& waypoint
 
 void MyStrategy::shootEnemy(model::Move& move)
 {
-
 	if (m_self->getProjectileCount() > 0 && m_self->getRemainingProjectileCooldownTicks() == 0)
 	{
 		const PointD selfPoint = PointD(*m_self);
@@ -644,6 +655,20 @@ PointD MyStrategy::getTurnEntryPoint(const TilePathNode& turn) const
 	}
 
 	return entry;
+}
+
+double MyStrategy::getAngleBetween(const PointD& src, double srcAngle, const PointD& target)
+{
+	double absoluteAngleTo = atan2(target.y - src.y, target.x - src.x);
+	double relativeAngleTo = absoluteAngleTo - srcAngle;
+
+	while (relativeAngleTo > PI)
+		relativeAngleTo -= 2.0 * PI;
+
+	while (relativeAngleTo < -PI)
+		relativeAngleTo += 2.0 * PI;
+
+	return relativeAngleTo;
 }
 
 MyStrategy::Statistics::Statistics()

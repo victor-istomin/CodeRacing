@@ -24,7 +24,7 @@ struct DebugVisualizer
 	void preRenderFinish() { }
 
 	void renderWypoints(const Map&, const model::Game&, const model::World&, const model::Car&) {}
-	void renderMoveTarget(const model::Car&, const model::Move&, const PointD&) {}
+	void renderMoveTarget(const model::Car&, const model::Move&, const PointD&, const PointD&) {}
 	void renderPath(Map&, const Path&) {}
 };
 #endif
@@ -42,6 +42,7 @@ struct DebugMessage
 
 
 	PointD m_destination;
+	PointD m_turn;
 
 	DebugMessage(DebugVisualizer& v, Map& map
 		, const model::Car& self, const model::World& world, const model::Game& game, const model::Move& move
@@ -55,7 +56,7 @@ struct DebugMessage
 		// pre-render block
 		m_v.preRenderStart();
 		m_v.renderWypoints(m_map, m_game, m_world, m_self);
-		m_v.renderMoveTarget(m_self, m_move, m_destination);
+		m_v.renderMoveTarget(m_self, m_move, m_destination, m_turn);
 		m_v.renderPath(m_map, m_turnsToWaypoint);
 
 		m_v.preRenderFinish();
@@ -132,6 +133,8 @@ private:
 
 	Path getTurnsToWaypoint();
 	PointD getTurnEntryPoint(const TilePathNode& turn) const;
+
+	static double getAngleBetween(const PointD& src, double srcAngle, const PointD& target);
 };
 
 #endif
